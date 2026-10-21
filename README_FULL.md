@@ -27,6 +27,8 @@ accessible même sur un petit écran.
 ### Caractéristiques techniques
 
 - 🎨 **Interface moderne** avec mode sombre (ttkbootstrap)
+- Compatibilité GUI : ttkbootstrap 1.x (`>=1.10.1,<2`) ; la version 2 modifie l'API utilisée par l'application.
+- HTTPX est déclaré comme dépendance directe pour les connexions du client IA.
 - 🔐 **Sécurité intégrée** : clés Fernet aléatoires conservées dans le trousseau système
 - 🔑 **Clé API** stockée uniquement dans le trousseau système, jamais dans le fichier de configuration
 - 📚 **Historique chiffré** de vos requêtes et réponses
