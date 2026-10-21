@@ -14,6 +14,7 @@ from typing import Any, Optional, Callable
 from ..core.config_manager import ConfigManager
 from ..core.openai_client import OpenAIClient
 from .widgets.ai_settings import validate_ai_settings
+from .branding import apply_window_icon
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class FirstRunWizard:
 
         # Fenêtre modale
         self.window = ttk.Toplevel(parent)
+        apply_window_icon(self.window)
         self.window.title("🚀 Configuration initiale - IA-MultiTools")
         width = min(900, self.window.winfo_screenwidth() - 80)
         height = min(760, self.window.winfo_screenheight() - 100)

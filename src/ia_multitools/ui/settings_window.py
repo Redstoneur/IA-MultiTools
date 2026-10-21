@@ -16,6 +16,7 @@ from ..core.config_manager import ConfigManager
 from ..core.openai_client import OpenAIClient, init_openai_client
 from .widgets.ai_settings import validate_ai_settings
 from .widgets.scrollable_form import ScrollableForm
+from .branding import apply_window_icon
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class SettingsWindow:
 
         # Créer la fenêtre
         self.window = ttk.Toplevel(parent)
+        apply_window_icon(self.window)
         self.window.title("Paramètres - IA-MultiTools")
         width = min(950, self.window.winfo_screenwidth() - 80)
         height = min(800, self.window.winfo_screenheight() - 100)
@@ -534,6 +536,7 @@ class SettingsWindow:
     def _set_password(self) -> None:
         """Ouvre le dialogue pour définir/changer le mot de passe."""
         dialog = ttk.Toplevel(self.window)
+        apply_window_icon(dialog)
         dialog.title("Définir un mot de passe")
         dialog.geometry("400x300")
         dialog.resizable(False, False)

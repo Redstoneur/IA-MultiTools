@@ -10,6 +10,7 @@ from tkinter import messagebox
 from typing import Any, Optional, Callable
 
 from ..core.authentication import AuthenticationManager
+from .branding import apply_window_icon
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,11 @@ class PasswordDialog:
         self.authenticated = False
 
         # Fenêtre modale
-        self.window = ttk.Toplevel(parent) if parent else ttk.Window(themename="darkly")
+        self.window = (
+            ttk.Toplevel(parent) if parent
+            else ttk.Window(themename="darkly", iconphoto=None)
+        )
+        apply_window_icon(self.window)
         self.window.title("🔒 Authentification - IA-MultiTools")
         self.window.geometry("450x300")
         self.window.resizable(False, False)
@@ -232,5 +237,4 @@ class PasswordDialog:
         """
         self.window.wait_window()
         return self.authenticated
-
 

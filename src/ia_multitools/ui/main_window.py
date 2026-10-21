@@ -10,8 +10,6 @@ from tkinter import messagebox
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from typing import Optional
-from pathlib import Path
-import sys
 
 from ..core.config_manager import ConfigManager
 from ..core.authentication import AuthenticationManager
@@ -23,6 +21,7 @@ from .tabs.email_tab import EmailTab
 from .tabs.translation_tab import TranslationTab
 from .settings_window import SettingsWindow
 from .first_run_wizard import FirstRunWizard
+from .branding import apply_window_icon, resolve_asset_path
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +55,8 @@ class MainWindow:
         # Créer la fenêtre principale
         self.root = ttk.Window(
             title="IA-MultiTools",
-            themename=self.config.appearance.theme
+            themename=self.config.appearance.theme,
+            iconphoto=None,
         )
 
         width = min(1000, self.root.winfo_screenwidth() - 80)
@@ -88,34 +88,17 @@ class MainWindow:
             logger.info("Premier lancement détecté, affichage de l'assistant")
             self.root.after(500, self._show_first_run_wizard)
 
-    def _resolve_asset_path(self, filename: str) -> Optional[Path]:
-        """Résout le chemin d'un asset en mode dev et en mode PyInstaller."""
-        candidate_dirs = []
-        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-            candidate_dirs.append(Path(sys._MEIPASS) / "assets")
-
-        candidate_dirs.extend([
-            Path(__file__).resolve().parents[3] / "assets",
-            Path.cwd() / "assets",
-        ])
-
-        for directory in candidate_dirs:
-            candidate = directory / filename
-            if candidate.exists():
-                return candidate
-        return None
-
     def _setup_branding(self) -> None:
         """Charge et applique le logo/icône de l'application si disponible."""
-        logo_path = self._resolve_asset_path("logo.png")
+        apply_window_icon(self.root)
+        logo_path = resolve_asset_path("logo.png")
         if not logo_path:
             logger.warning("Logo non trouvé dans assets/logo.png")
             return
         try:
-            self.logo_image = tk.PhotoImage(file=str(logo_path)).subsample(4, 4)
-            logo_image = self.logo_image
-            if logo_image is not None:
-                self.root.iconphoto(True, logo_image)
+            self.logo_image = tk.PhotoImage(
+                master=self.root, file=str(logo_path)
+            ).subsample(4, 4)
             logger.info(f"Logo chargé: {logo_path}")
         except Exception as exc:
             logger.warning(f"Impossible de charger le logo: {exc}")

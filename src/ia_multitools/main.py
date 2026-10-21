@@ -12,6 +12,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from .constants import APP_FULL_NAME
+from .ui.branding import apply_window_icon
 
 # Configuration du logging avant tout import
 def setup_logging(debug_mode: bool = False) -> None:
@@ -139,8 +140,9 @@ def main() -> int:
             # Si possible, afficher une boîte de dialogue
             try:
                 root = tk.Tk()
+                apply_window_icon(root)
                 root.withdraw()
-                messagebox.showerror("Dépendances manquantes", error_msg)
+                messagebox.showerror("Dépendances manquantes", error_msg, parent=root)
                 root.destroy()
             except:
                 pass
@@ -241,11 +243,13 @@ def main() -> int:
         # Afficher une boîte de dialogue si possible
         try:
             root = tk.Tk()
+            apply_window_icon(root)
             root.withdraw()
             messagebox.showerror(
                 "Erreur fatale",
                 f"Une erreur inattendue s'est produite:\n\n{str(e)}\n\n"
-                f"Consultez les logs pour plus de détails."
+                f"Consultez les logs pour plus de détails.",
+                parent=root,
             )
             root.destroy()
         except:
