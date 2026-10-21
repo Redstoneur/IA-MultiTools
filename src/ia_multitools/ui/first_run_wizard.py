@@ -31,7 +31,9 @@ class FirstRunWizard:
         """
         self.config_manager = config_manager
         self.on_complete = on_complete
-        self._last_successful_test_signature: Optional[tuple[str, str, str]] = None
+        self._last_successful_test_signature: Optional[
+            tuple[str, str, str, float, int, bool]
+        ] = None
 
         # Fenêtre modale
         self.window = ttk.Toplevel(parent)
@@ -60,6 +62,14 @@ class FirstRunWizard:
 
     def _build_ui(self) -> None:
         """Construit l'interface de l'assistant."""
+        config = self.config_manager.get_config().ai
+        self.base_url_var = tk.StringVar(value=config.base_url)
+        self.api_key_var = tk.StringVar(value=config.api_key)
+        self.model_var = tk.StringVar(value=config.model)
+        self.temperature_var = tk.StringVar(value=str(config.temperature))
+        self.timeout_var = tk.StringVar(value=str(config.timeout))
+        self.verify_ssl_var = tk.BooleanVar(value=config.verify_ssl)
+
         # Conteneur principal
         outer_frame = ttk.Frame(self.window, padding=20)
         outer_frame.pack(fill=BOTH, expand=YES)
@@ -107,21 +117,69 @@ class FirstRunWizard:
             wraplength=420
         ).pack(anchor=W, pady=(0, 5))
 
-        self.base_url_entry = ttk.Entry(config_frame, font=("Segoe UI", 10))
-        self.base_url_entry.insert(0, "http://127.0.0.1:1234/v1")
+        self.base_url_entry = ttk.Entry(
+            config_frame, font=("Segoe UI", 10), textvariable=self.base_url_var
+        )
         self.base_url_entry.pack(fill=X, pady=(0, 15))
 
         # Clé API
         ttk.Label(config_frame, text="Clé API (optionnel pour serveurs locaux):", font=("Segoe UI", 10, "bold")).pack(anchor=W, pady=(0, 5))
-        self.api_key_entry = ttk.Entry(config_frame, font=("Segoe UI", 10), show="*")
+        self.api_key_entry = ttk.Entry(
+            config_frame, font=("Segoe UI", 10), show="*", textvariable=self.api_key_var
+        )
         self.api_key_entry.pack(fill=X, pady=(0, 15))
+
+        self.verify_ssl_check = ttk.Checkbutton(
+            config_frame,
+            text="Vérifier les certificats SSL",
+            variable=self.verify_ssl_var,
+        )
+        self.verify_ssl_check.pack(anchor=W, pady=(0, 5))
+        ttk.Label(
+            config_frame,
+            text="Recommandé : laissez cette option activée. La désactiver rend les connexions HTTPS non vérifiées.",
+            bootstyle=WARNING,
+            wraplength=420,
+        ).pack(anchor=W, pady=(0, 15))
 
         # Modèle
         ttk.Label(config_frame, text="Nom du modèle:", font=("Segoe UI", 10, "bold")).pack(anchor=W, pady=(0, 5))
-        self.model_entry = ttk.Entry(config_frame, font=("Segoe UI", 10))
-        self.model_entry.insert(0, "meta-llama-3.1-8b-instruct")
-        self.model_entry.pack(fill=X, pady=(0, 15))
-        for entry in (self.base_url_entry, self.api_key_entry, self.model_entry):
+        self.model_entry = ttk.Combobox(
+            config_frame, font=("Segoe UI", 10), textvariable=self.model_var, state="normal"
+        )
+        self.model_entry.pack(fill=X, pady=(0, 5))
+        self.models_btn = ttk.Button(
+            config_frame, text="Charger les modèles disponibles",
+            command=self._load_models, bootstyle=INFO,
+        )
+        self.models_btn.pack(anchor=W, pady=(0, 5))
+        ttk.Label(
+            config_frame,
+            text="Liste fournie par votre serveur API. Vous pouvez aussi saisir un nom manuellement.",
+            wraplength=420,
+        ).pack(anchor=W, pady=(0, 15))
+
+        ttk.Label(
+            config_frame, text="Température (0.0 - 2.0):", font=("Segoe UI", 10, "bold")
+        ).pack(anchor=W, pady=(0, 5))
+        self.temperature_entry = ttk.Spinbox(
+            config_frame, from_=0.0, to=2.0, increment=0.1,
+            textvariable=self.temperature_var,
+        )
+        self.temperature_entry.pack(fill=X, pady=(0, 15))
+        ttk.Label(
+            config_frame, text="Timeout (secondes):", font=("Segoe UI", 10, "bold")
+        ).pack(anchor=W, pady=(0, 5))
+        self.timeout_entry = ttk.Spinbox(
+            config_frame, from_=1, to=300, increment=10,
+            textvariable=self.timeout_var,
+        )
+        self.timeout_entry.pack(fill=X, pady=(0, 15))
+        for entry in (
+            self.base_url_entry, self.api_key_entry, self.model_entry,
+            self.temperature_entry, self.timeout_entry, self.verify_ssl_check,
+            self.models_btn,
+        ):
             entry.bind("<FocusIn>", self._scroll_to_field)
 
         # Zone de statut
@@ -172,6 +230,92 @@ class FirstRunWizard:
         ).pack()
         for frame in (header_frame, config_frame, info_frame):
             frame.bind("<Configure>", self._wrap_labels)
+        for variable in (
+            self.base_url_var, self.api_key_var, self.model_var,
+            self.temperature_var, self.timeout_var, self.verify_ssl_var,
+        ):
+            variable.trace_add("write", self._invalidate_test)
+        for variable in (self.base_url_var, self.api_key_var, self.verify_ssl_var):
+            variable.trace_add("write", self._clear_models)
+
+    def _invalidate_test(self, *_args: str) -> None:
+        self._last_successful_test_signature = None
+        self.save_btn.config(state="disabled")
+        self.status_label.config(text="Paramètres modifiés : testez la connexion.", bootstyle=INFO)
+
+    def _clear_models(self, *_args: str) -> None:
+        self.model_entry.configure(values=())
+
+    def _get_ai_signature(self, require_model: bool = True) -> tuple[str, str, str, float, int, bool]:
+        base_url = self.base_url_var.get().strip()
+        model = self.model_var.get().strip()
+        if not base_url:
+            raise ValueError("Veuillez entrer l'URL de base.")
+        if require_model and not model:
+            raise ValueError("Veuillez entrer ou sélectionner le nom du modèle.")
+        try:
+            temperature = float(self.temperature_var.get())
+        except ValueError as exc:
+            raise ValueError("La température doit être un nombre entre 0 et 2.") from exc
+        if not 0 <= temperature <= 2:
+            raise ValueError("La température doit être comprise entre 0 et 2.")
+        try:
+            timeout = int(self.timeout_var.get())
+        except ValueError as exc:
+            raise ValueError("Le timeout doit être un nombre entier positif de secondes.") from exc
+        if timeout <= 0:
+            raise ValueError("Le timeout doit être supérieur à zéro.")
+        return (
+            base_url, model, self.api_key_var.get().strip(),
+            temperature, timeout, self.verify_ssl_var.get(),
+        )
+
+    def _load_models(self) -> None:
+        """Récupère les modèles avec les paramètres de connexion actuels."""
+        try:
+            base_url, model, api_key, temperature, timeout, verify_ssl = self._get_ai_signature(False)
+        except ValueError as exc:
+            messagebox.showerror("Paramètres invalides", str(exc), parent=self.window)
+            return
+
+        self.models_btn.config(state="disabled")
+        self.status_label.config(text="Chargement des modèles...", bootstyle=INFO)
+        self.window.update_idletasks()
+        client: Optional[OpenAIClient] = None
+        try:
+            client = OpenAIClient(
+                api_key=api_key or "sk-dummy", base_url=base_url, model=model,
+                temperature=temperature, timeout=timeout, verify_ssl=verify_ssl,
+            )
+            models = sorted(set(client.list_models()))
+            self.model_entry.configure(values=models)
+            if not models:
+                self.status_label.config(text="Aucun modèle récupéré.", bootstyle=WARNING)
+                messagebox.showwarning(
+                    "Modèles indisponibles",
+                    "Aucun modèle récupéré. Vérifiez l'URL, la clé API, le réglage SSL "
+                    "et la disponibilité du serveur. La saisie manuelle reste possible.",
+                    parent=self.window,
+                )
+                return
+            if model not in models:
+                self.model_var.set(models[0])
+            self.status_label.config(
+                text=f"{len(models)} modèle(s) disponible(s). Choisissez puis testez la connexion.",
+                bootstyle=INFO,
+            )
+        except Exception as exc:
+            logger.error("Erreur lors du chargement des modèles: %s", type(exc).__name__)
+            self.model_entry.configure(values=())
+            self.status_label.config(text="Chargement des modèles impossible.", bootstyle=DANGER)
+            messagebox.showerror(
+                "Erreur", f"Impossible de charger les modèles ({type(exc).__name__}).",
+                parent=self.window,
+            )
+        finally:
+            if client is not None:
+                client.close()
+            self.models_btn.config(state="normal")
 
     def _wrap_labels(self, event: tk.Event) -> None:
         """Adapte les textes à la largeur disponible dans le formulaire."""
@@ -190,19 +334,15 @@ class FirstRunWizard:
 
     def _test_connection(self) -> None:
         """Teste la connexion à l'API."""
-        base_url = self.base_url_entry.get().strip()
-        api_key = self.api_key_entry.get().strip()
-        model = self.model_entry.get().strip()
-
-        if not base_url:
-            messagebox.showerror("Erreur", "Veuillez entrer l'URL de base.")
+        try:
+            signature = self._get_ai_signature()
+        except ValueError as exc:
+            messagebox.showerror("Paramètres invalides", str(exc), parent=self.window)
             return
-
-        if not model:
-            messagebox.showerror("Erreur", "Veuillez entrer le nom du modèle.")
-            return
+        base_url, model, api_key, temperature, timeout, verify_ssl = signature
 
         # Désactiver les boutons pendant le test
+        self._last_successful_test_signature = None
         self.test_btn.config(state="disabled", text="⏳ Test en cours...")
         self.save_btn.config(state="disabled")
         self.status_label.config(text="Test de connexion en cours...", bootstyle=INFO)
@@ -216,7 +356,9 @@ class FirstRunWizard:
                 api_key=api_key or "sk-dummy",
                 base_url=base_url,
                 model=model,
-                timeout=10
+                temperature=temperature,
+                timeout=timeout,
+                verify_ssl=verify_ssl,
             )
 
             # Test simple
@@ -227,7 +369,7 @@ class FirstRunWizard:
             )
 
             if response:
-                self._last_successful_test_signature = (base_url, model, api_key)
+                self._last_successful_test_signature = signature
                 self.status_label.config(
                     text="✅ Connexion réussie ! Vous pouvez enregistrer.",
                     bootstyle=SUCCESS
@@ -259,15 +401,14 @@ class FirstRunWizard:
 
     def _save_and_continue(self) -> None:
         """Enregistre la configuration et ferme l'assistant."""
-        base_url = self.base_url_entry.get().strip()
-        api_key = self.api_key_entry.get().strip()
-        model = self.model_entry.get().strip()
-
-        if not base_url or not model:
-            messagebox.showerror("Erreur", "Veuillez remplir tous les champs obligatoires.")
+        try:
+            signature = self._get_ai_signature()
+        except ValueError as exc:
+            messagebox.showerror("Paramètres invalides", str(exc), parent=self.window)
             return
+        base_url, model, api_key, temperature, timeout, verify_ssl = signature
 
-        if self._last_successful_test_signature != (base_url, model, api_key):
+        if self._last_successful_test_signature != signature:
             self.save_btn.config(state="disabled")
             messagebox.showerror(
                 "Test requis",
@@ -282,6 +423,9 @@ class FirstRunWizard:
             config.ai.base_url = base_url
             config.ai.api_key = api_key
             config.ai.model = model
+            config.ai.temperature = temperature
+            config.ai.timeout = timeout
+            config.ai.verify_ssl = verify_ssl
             config.first_run = False  # Marquer comme configuré
 
             # Sauvegarder

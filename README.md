@@ -31,6 +31,14 @@ python -m src.ia_multitools.main
 python run.py --debug
 ```
 
+Au premier lancement, l'assistant permet de charger les modèles proposés par
+votre serveur API et d'en choisir un dans une liste déroulante (ou de saisir son
+nom). Vous pouvez aussi régler la température (0 à 2), le timeout en secondes
+et la vérification des certificats SSL, activée par défaut et recommandée.
+Le chargement des modèles utilise votre URL, votre clé API et vos réglages
+SSL/timeout ; il ne garantit pas que chaque modèle prend en charge la génération
+de texte. Testez la connexion avec le modèle choisi avant d'enregistrer.
+
 ## 🔐 Sécurité
 
 - Chiffrement Fernet avec une clé aléatoire conservée dans le trousseau système
