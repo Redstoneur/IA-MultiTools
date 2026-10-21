@@ -1,11 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="IA-MultiTools logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">IA-MultiTools - logo</title>
+  <desc id="desc">Emblème circulaire sans texte représentant un cerveau électronique et quatre outils numériques.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0d6efd"/>
-      <stop offset="100%" stop-color="#6610f2"/>
+    <linearGradient id="ring" x1="70" y1="90" x2="440" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1769ff"/><stop offset=".52" stop-color="#00c7e8"/><stop offset="1" stop-color="#18d69a"/>
     </linearGradient>
+    <linearGradient id="brainLeft" x1="180" y1="190" x2="255" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08c8f5"/><stop offset="1" stop-color="#2877ff"/>
+    </linearGradient>
+    <linearGradient id="brainRight" x1="255" y1="190" x2="335" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#75f59b"/><stop offset="1" stop-color="#00c8ad"/>
+    </linearGradient>
+    <linearGradient id="chat" x1="115" y1="125" x2="190" y2="205" gradientUnits="userSpaceOnUse"><stop stop-color="#a34bff"/><stop offset="1" stop-color="#5c20d7"/></linearGradient>
+    <linearGradient id="code" x1="325" y1="125" x2="400" y2="205" gradientUnits="userSpaceOnUse"><stop stop-color="#05d9bf"/><stop offset="1" stop-color="#008c91"/></linearGradient>
+    <linearGradient id="translate" x1="110" y1="315" x2="190" y2="395" gradientUnits="userSpaceOnUse"><stop stop-color="#ffca22"/><stop offset="1" stop-color="#ff7900"/></linearGradient>
+    <linearGradient id="tools" x1="325" y1="315" x2="405" y2="395" gradientUnits="userSpaceOnUse"><stop stop-color="#a34bff"/><stop offset="1" stop-color="#6320c8"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#00112c" flood-opacity=".22"/></filter>
   </defs>
-  <rect x="16" y="16" width="224" height="224" rx="48" fill="url(#bg)"/>
-  <path d="M84 176V80h20v96H84zm68 0-8-24h-32l-8 24H82l35-96h22l35 96h-22zm-13-42-11-33-11 33h22z" fill="#ffffff"/>
+  <!-- App-icon silhouette -->
+  <circle cx="256" cy="256" r="235" fill="#071832"/>
+  <circle cx="256" cy="256" r="235" fill="none" stroke="url(#ring)" stroke-width="13"/>
+  <circle cx="256" cy="256" r="190" fill="none" stroke="url(#ring)" stroke-width="8" stroke-dasharray="105 22" stroke-linecap="butt" opacity=".95"/>
+  <!-- Four tool bubbles -->
+  <g filter="url(#shadow)">
+    <circle cx="153" cy="157" r="47" fill="url(#chat)"/>
+    <circle cx="359" cy="157" r="47" fill="url(#code)"/>
+    <circle cx="153" cy="359" r="47" fill="url(#translate)"/>
+    <circle cx="359" cy="359" r="47" fill="url(#tools)"/>
+  </g>
+  <!-- Chat bubble -->
+  <path d="M132 137h42a8 8 0 0 1 8 8v23a8 8 0 0 1-8 8h-21l-12 10v-10h-9a8 8 0 0 1-8-8v-23a8 8 0 0 1 8-8Z" fill="none" stroke="#fff" stroke-width="5.5" stroke-linejoin="round"/>
+  <path d="M135 148h34M135 158h34M135 168h21" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Code brackets -->
+  <path d="m345 141-14 16 14 16M373 141l14 16-14 16M365 136l-12 42" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Translation glyph: stylized A and character strokes -->
+  <path d="M132 341h34M149 332v25M137 339c3 13 11 22 23 27M160 339c-3 12-10 21-21 27M165 374l10-27 10 27M169 365h12" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Wrench -->
+  <path d="M370 337a20 20 0 0 0-24 24l-20 20a8 8 0 0 0 11 11l20-20a20 20 0 0 0 24-24l-12 12-11-11Z" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Central electronic brain -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9">
+    <path d="M251 210c-9-18-35-19-45-2-17-1-28 13-27 29-15 9-17 29-6 41-7 15 1 32 15 37 0 17 14 27 29 24 7 13 23 15 34 7Z" stroke="url(#brainLeft)"/>
+    <path d="M261 210c9-18 35-19 45-2 17-1 28 13 27 29 15 9 17 29 6 41 7 15-1 32-15 37 0 17-14 27-29 24-7 13-23 15-34 7Z" stroke="url(#brainRight)"/>
+    <path d="M256 210v136" stroke="url(#ring)"/>
+    <path d="M239 237l-18 15v23M239 274l-22 20v22M273 237l18 15v23M273 274l22 20v22" stroke="url(#ring)"/>
+  </g>
+  <g fill="#071832" stroke-width="7">
+    <circle cx="221" cy="252" r="8" stroke="#08c8f5"/><circle cx="217" cy="294" r="8" stroke="#2877ff"/>
+    <circle cx="291" cy="252" r="8" stroke="#75f59b"/><circle cx="295" cy="294" r="8" stroke="#00c8ad"/>
+  </g>
 </svg>
-
