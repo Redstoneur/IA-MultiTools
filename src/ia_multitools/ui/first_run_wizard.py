@@ -7,6 +7,7 @@ import copy
 import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
+from ttkbootstrap.scrolled import ScrolledFrame
 from tkinter import messagebox
 from typing import Any, Optional, Callable
 
@@ -35,15 +36,16 @@ class FirstRunWizard:
         # Fenêtre modale
         self.window = ttk.Toplevel(parent)
         self.window.title("🚀 Configuration initiale - IA-MultiTools")
-        self.window.geometry("700x550")
-        self.window.resizable(False, False)
+        width = min(900, self.window.winfo_screenwidth() - 80)
+        height = min(760, self.window.winfo_screenheight() - 100)
+        self.window.geometry(f"{width}x{height}")
+        self.window.minsize(min(500, width), min(400, height))
+        self.window.resizable(True, True)
         self.window.transient(parent)
         self.window.grab_set()
 
-        # Centrer la fenêtre
-        self._center_window()
-
         self._build_ui()
+        self._center_window()
 
         logger.info("Assistant de premier lancement ouvert")
 
@@ -59,7 +61,15 @@ class FirstRunWizard:
     def _build_ui(self) -> None:
         """Construit l'interface de l'assistant."""
         # Conteneur principal
-        main_frame = ttk.Frame(self.window, padding=30)
+        outer_frame = ttk.Frame(self.window, padding=20)
+        outer_frame.pack(fill=BOTH, expand=YES)
+        button_frame = ttk.Frame(outer_frame)
+        button_frame.pack(side=BOTTOM, fill=X, pady=(15, 0))
+        button_frame.columnconfigure((0, 1), weight=1, uniform="actions")
+
+        self.form = ScrolledFrame(outer_frame, autohide=False)
+        self.form.pack(fill=BOTH, expand=YES)
+        main_frame = ttk.Frame(self.form, padding=(0, 0, 15, 0))
         main_frame.pack(fill=BOTH, expand=YES)
 
         # En-tête
@@ -69,13 +79,15 @@ class FirstRunWizard:
         ttk.Label(
             header_frame,
             text="🎉 Bienvenue dans IA-MultiTools !",
-            font=("Segoe UI", 18, "bold")
+            font=("Segoe UI", 18, "bold"),
+            wraplength=420
         ).pack(anchor=W)
 
         ttk.Label(
             header_frame,
             text="Configurons votre connexion IA pour commencer",
-            font=("Segoe UI", 11)
+            font=("Segoe UI", 11),
+            wraplength=420
         ).pack(anchor=W, pady=(5, 0))
 
         # Séparateur
@@ -91,7 +103,8 @@ class FirstRunWizard:
             config_frame,
             text="Exemples: http://localhost:1234/v1 (LM Studio), http://localhost:8080/v1 (LocalAI)",
             font=("Segoe UI", 9),
-            foreground="gray"
+            foreground="gray",
+            wraplength=420
         ).pack(anchor=W, pady=(0, 5))
 
         self.base_url_entry = ttk.Entry(config_frame, font=("Segoe UI", 10))
@@ -108,46 +121,43 @@ class FirstRunWizard:
         self.model_entry = ttk.Entry(config_frame, font=("Segoe UI", 10))
         self.model_entry.insert(0, "meta-llama-3.1-8b-instruct")
         self.model_entry.pack(fill=X, pady=(0, 15))
+        for entry in (self.base_url_entry, self.api_key_entry, self.model_entry):
+            entry.bind("<FocusIn>", self._scroll_to_field)
 
         # Zone de statut
         self.status_label = ttk.Label(
             config_frame,
             text="",
             font=("Segoe UI", 9),
-            bootstyle=INFO
+            bootstyle=INFO,
+            wraplength=420
         )
         self.status_label.pack(fill=X, pady=10)
 
         # Boutons d'action
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=X)
-
         self.test_btn = ttk.Button(
             button_frame,
             text="🔍 Tester la connexion",
             command=self._test_connection,
-            bootstyle=INFO,
-            width=25
+            bootstyle=INFO
         )
-        self.test_btn.pack(side=LEFT, padx=(0, 10))
+        self.test_btn.grid(row=0, column=0, sticky=EW, padx=(0, 5))
 
         self.save_btn = ttk.Button(
             button_frame,
             text="✓ Enregistrer et continuer",
             command=self._save_and_continue,
             bootstyle=SUCCESS,
-            width=25,
             state="disabled"
         )
-        self.save_btn.pack(side=LEFT)
+        self.save_btn.grid(row=0, column=1, sticky=EW, padx=(5, 0))
 
         ttk.Button(
             button_frame,
             text="Ignorer (configurer plus tard)",
             command=self._skip,
-            bootstyle=SECONDARY,
-            width=25
-        ).pack(side=RIGHT)
+            bootstyle=SECONDARY
+        ).grid(row=1, column=0, columnspan=2, sticky=EW, pady=(10, 0))
 
         # Instructions
         info_frame = ttk.Frame(main_frame)
@@ -157,8 +167,26 @@ class FirstRunWizard:
             info_frame,
             text="💡 Astuce: Vous pouvez toujours modifier ces paramètres via le menu Paramètres.",
             font=("Segoe UI", 9),
-            foreground="gray"
+            foreground="gray",
+            wraplength=420
         ).pack()
+        for frame in (header_frame, config_frame, info_frame):
+            frame.bind("<Configure>", self._wrap_labels)
+
+    def _wrap_labels(self, event: tk.Event) -> None:
+        """Adapte les textes à la largeur disponible dans le formulaire."""
+        for widget in event.widget.winfo_children():
+            if isinstance(widget, ttk.Label):
+                widget.configure(wraplength=max(1, event.width - 40))
+
+    def _scroll_to_field(self, event: tk.Event) -> None:
+        """Garde le champ actif visible lors de la navigation au clavier."""
+        field = event.widget
+        top = self.form.container.winfo_rooty()
+        bottom = top + self.form.container.winfo_height()
+        if field.winfo_rooty() < top or field.winfo_rooty() + field.winfo_height() > bottom:
+            offset = field.winfo_rooty() - self.form.winfo_rooty()
+            self.form.yview_moveto(max(0, offset - 10) / self.form.winfo_height())
 
     def _test_connection(self) -> None:
         """Teste la connexion à l'API."""

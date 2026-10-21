@@ -149,6 +149,8 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -216,3 +218,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local application state and release archives
+/data/
+/logs/
+/release-assets/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

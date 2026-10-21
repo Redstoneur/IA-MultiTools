@@ -4,7 +4,6 @@ Script de build PyInstaller pour IA-MultiTools.
 Génère un exécutable standalone pour Windows et Linux.
 """
 
-import os
 import sys
 import platform
 import subprocess
@@ -34,17 +33,18 @@ def build_executable():
     print(f"\n📦 Système détecté: {system}")
 
     # Paramètres communs
-    main_script = "src/ia_multitools/main.py"
+    main_script = "run.py"
     app_name = "IA-MultiTools"
     separator = ";" if system == "Windows" else ":"
 
     # Commande PyInstaller
     cmd = [
-        "pyinstaller",
+        sys.executable, "-m", "PyInstaller",
         "--onefile",
         "--windowed",
         "--name", app_name,
         "--clean",
+        "--paths", "src",
         "--add-data", f"assets{separator}assets",
 
         # Imports cachés
@@ -125,7 +125,6 @@ def clean_build_files():
     print("\n🧹 Nettoyage des fichiers de build...")
 
     dirs_to_clean = ["build", "dist", "__pycache__"]
-    files_to_clean = ["*.spec"]
 
     for dir_name in dirs_to_clean:
         dir_path = Path(dir_name)
@@ -148,9 +147,9 @@ def main():
         return
 
     # Vérifier que nous sommes à la racine du projet
-    if not Path("src/ia_multitools/main.py").exists():
+    if not Path("run.py").exists():
         print("❌ Erreur: Lancez ce script depuis la racine du projet")
-        return
+        sys.exit(1)
 
     # Build
     success = build_executable()

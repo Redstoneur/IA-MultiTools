@@ -286,85 +286,27 @@ def test_with_mock():
 
 ## Build et distribution
 
-### PyInstaller
+### Scripts de compilation
 
-Pour créer un exécutable:
-
-**Windows:**
+Installez les dépendances dans un environnement Python 3.12 ou supérieur :
 
 ```bash
-pyinstaller --onefile --windowed --name IA-MultiTools --icon=assets/logo.ico src/ia_multitools/main.py
+python -m pip install -e ".[dev]"
 ```
 
-**Linux:**
+Sous Windows, lancez `.\build.bat`. Sous Linux, lancez `sh build.sh`.
+Les deux scripts se placent à la racine du dépôt et appellent `build.py`
+avec le Python de l'environnement virtuel actif, sinon celui de `.venv`
+s'il existe, sinon celui du système.
 
-```bash
-pyinstaller --onefile --windowed --name IA-MultiTools src/ia_multitools/main.py
-```
+Le build inclut les ressources et les imports nécessaires à l'application.
+L'exécutable est créé dans `dist/`. Pour nettoyer les fichiers générés :
+`.\build.bat clean` sous Windows ou `sh build.sh clean` sous Linux.
+Ces commandes ne suppriment pas les données utilisateur.
 
-L'exécutable sera dans `dist/`.
-
-### Spec file personnalisé
-
-Créer `IA-MultiTools.spec`:
-
-```python
-# -*- mode: python ; coding: utf-8 -*-
-
-block_cipher = None
-
-a = Analysis(
-    ['src/ia_multitools/main.py'],
-    pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=[
-        'ttkbootstrap',
-        'openai',
-        'cryptography',
-        'keyring'
-    ],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='IA-MultiTools',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon='assets/logo.ico'  # Windows
-)
-```
-
-Puis build:
-
-```bash
-pyinstaller IA-MultiTools.spec
-```
+Le workflow `.github/workflows/release.yml` utilise ces scripts et joint les
+archives Windows et Linux à chaque release publiée. Les fichiers `.spec`
+générés, `build/`, `dist/` et `release-assets/` ne doivent pas être versionnés.
 
 ## Bonnes pratiques
 

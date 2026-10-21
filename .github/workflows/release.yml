@@ -31,10 +31,20 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
-      - name: Build executable
+      - name: Build Windows executable
+        if: runner.os == 'Windows'
+        shell: cmd
         run: |
-          python build.py clean
-          python build.py
+          call build.bat clean
+          if errorlevel 1 exit /b 1
+          call build.bat
+
+      - name: Build Linux executable
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sh build.sh clean
+          sh build.sh
 
       - name: Package Windows binary
         if: runner.os == 'Windows'
@@ -57,4 +67,3 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           gh release upload "$TAG" release-assets/* --clobber
-

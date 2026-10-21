@@ -43,6 +43,20 @@ python run.py --debug
 
 Voir [README_FULL.md](README_FULL.md) pour la documentation complète.
 
+## 📦 Construire un exécutable
+
+Installez les dépendances de développement avec `python -m pip install -e ".[dev]"`,
+puis lancez `.\build.bat` sous Windows ou `sh build.sh` sous Linux.
+Les scripts utilisent l'environnement virtuel actif, sinon `.venv` s'il existe,
+et transmettent les arguments à `build.py`.
+
+L'exécutable est créé dans `dist/`. Pour nettoyer les fichiers de compilation,
+utilisez `.\build.bat clean` ou `sh build.sh clean`.
+Le workflow de release utilise ces mêmes scripts pour Windows et Linux.
+
+Les données locales (`data/`, `logs/`), les archives de release et les fichiers
+`.env` privés sont ignorés par Git ; `.env.example` reste versionné.
+
 ## 📄 Licence
 
 GNU General Public License v3.0 (GPL-3.0-only) - Voir [LICENSE](LICENSE)
