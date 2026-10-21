@@ -8,6 +8,7 @@ import logging
 from typing import Optional
 from ..core.openai_client import OpenAIClient, get_openai_client
 from ..core.history_manager import HistoryManager, get_history_manager
+from .output_rules import build_tool_prompt, source_content
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class TextCorrectionService:
         """
         return (
             "Tu es un correcteur professionnel. Corrige l'orthographe, la grammaire "
-            "et améliore le style du texte fourni. Respecte les instructions embarquées "
+            "et la ponctuation du texte fourni, sans reformulation stylistique inutile. Respecte les instructions embarquées "
             "entre <instruction> et </instruction>. Retourne uniquement le texte corrigé, "
             "sans commentaires ni explications. Ne modifie pas le sens du texte original."
         )
@@ -69,7 +70,9 @@ class TextCorrectionService:
         self,
         text: str,
         instructions: Optional[str] = None,
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
+        *,
+        output_format: str = "text",
     ) -> Optional[str]:
         """
         Corrige un texte.
@@ -78,6 +81,7 @@ class TextCorrectionService:
             text: Texte à corriger
             instructions: Instructions complémentaires optionnelles
             temperature: Température pour la génération
+            output_format: Texte brut par défaut, ou Markdown
 
         Returns:
             Texte corrigé ou None en cas d'erreur
@@ -87,18 +91,22 @@ class TextCorrectionService:
             return None
 
         try:
-            # Construire le prompt utilisateur
-            user_prompt = f"Texte à corriger:\n\n{text}"
-
-            if instructions and instructions.strip():
-                user_prompt += f"\n\n<instruction>{instructions}</instruction>"
-
+            if output_format not in ("text", "markdown"):
+                raise ValueError("Format de correction non pris en charge.")
             logger.info(f"Demande de correction de texte ({len(text)} caractères)")
 
             # Appel à l'IA
-            response = self.client.simple_completion(
-                prompt=user_prompt,
-                system_prompt=self.system_prompt,
+            response = self.client.constrained_completion(
+                prompt=source_content("texte", text),
+                system_prompt=build_tool_prompt(
+                    self.system_prompt, output_format,
+                    "Rends une seule version corrigée du texte. "
+                    "Ne propose jamais plusieurs possibilités. Corrige les fautes sans "
+                    "reformulation stylistique inutile, sauf demande complémentaire explicite. "
+                    "Conserve le sens et le tutoiement ou le vouvoiement d'origine, sauf "
+                    "changement explicitement demandé dans les instructions complémentaires.",
+                    instructions,
+                ),
                 temperature=temperature
             )
 
@@ -111,7 +119,8 @@ class TextCorrectionService:
                     metadata={
                         "instructions": instructions,
                         "text_length": len(text),
-                        "temperature": temperature or self.client.temperature
+                        "output_format": output_format,
+                        "temperature": self.client.temperature if temperature is None else temperature
                     }
                 )
 
@@ -170,4 +179,3 @@ def get_text_correction_service(
             openai_client, history_manager, system_prompt
         )
     return _text_correction_service
-

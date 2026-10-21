@@ -11,6 +11,7 @@ import threading
 from typing import Any
 
 from ...core.config_manager import ConfigManager
+from ..widgets.scrollable_form import ScrollableForm
 from ...services.synonym_service import get_synonym_service, SynonymMode
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class SynonymTab:
         self.service = get_synonym_service()
 
         # Frame principal
-        self.frame = ttk.Frame(parent, padding=15)
+        self.frame = ScrollableForm(parent, padding=15)
 
         self._build_ui()
         logger.debug("Onglet Synonymes créé")
@@ -46,6 +47,10 @@ class SynonymTab:
         ttk.Label(input_frame, text="Mot ou expression:").pack(anchor=W, pady=(0, 5))
         self.word_entry = ttk.Entry(input_frame, font=("Segoe UI", 11))
         self.word_entry.pack(fill=X, pady=(0, 15))
+
+        ttk.Label(input_frame, text="Instructions complémentaires (optionnel):").pack(anchor=W)
+        self.instructions_entry = ttk.Entry(input_frame)
+        self.instructions_entry.pack(fill=X, pady=(5, 10))
 
         # Mode de recherche
         mode_frame = ttk.Frame(input_frame)
@@ -163,6 +168,8 @@ class SynonymTab:
 
         mode = self.mode_var.get()
         output_format = self.format_var.get()
+        instructions = self.instructions_entry.get().strip() or None
+        self.service.set_system_prompt(self.config_manager.get_config().prompts.synonym)
 
         # Désactiver le bouton pendant le traitement
         self.generate_btn.config(state="disabled", text="⏳ Génération en cours...")
@@ -172,13 +179,15 @@ class SynonymTab:
         # Lancer dans un thread séparé
         def process():
             try:
-                result = self.service.get_synonyms_antonyms(word, mode, output_format)
+                result = self.service.get_synonyms_antonyms(
+                    word, mode=mode, output_format=output_format, instructions=instructions
+                )
 
                 # Mettre à jour l'UI dans le thread principal
                 self.frame.after(0, lambda: self._update_result(result))
             except Exception as e:
                 logger.error(f"Erreur lors de la génération: {e}")
-                self.frame.after(0, lambda: self._update_result(None, str(e)))
+                self.frame.after(0, lambda error=str(e): self._update_result(None, error))
 
         thread = threading.Thread(target=process, daemon=True)
         thread.start()
@@ -217,6 +226,7 @@ class SynonymTab:
     def _reset(self) -> None:
         """Réinitialise l'onglet."""
         self.word_entry.delete(0, tk.END)
+        self.instructions_entry.delete(0, tk.END)
         self.result_text.delete("1.0", tk.END)
         self.mode_var.set("synonyms")
         self.format_var.set("text")

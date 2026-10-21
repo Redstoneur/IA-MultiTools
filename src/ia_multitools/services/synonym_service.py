@@ -8,6 +8,7 @@ import logging
 from typing import Optional, Literal
 from ..core.openai_client import OpenAIClient, get_openai_client
 from ..core.history_manager import HistoryManager, get_history_manager
+from .output_rules import build_tool_prompt, source_content
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,10 @@ class SynonymService:
         self,
         word: str,
         mode: SynonymMode = "synonyms",
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
+        *,
+        output_format: str = "text",
+        instructions: Optional[str] = None,
     ) -> Optional[str]:
         """
         Obtient des synonymes et/ou antonymes d'un mot.
@@ -80,6 +84,8 @@ class SynonymService:
             word: Mot à analyser
             mode: Mode de recherche ("synonyms", "antonyms", "both")
             temperature: Température pour la génération
+            output_format: Texte brut ou Markdown
+            instructions: Précisions complémentaires sur les mots recherchés
         
         Returns:
             Liste de synonymes/antonymes ou None en cas d'erreur
@@ -89,24 +95,30 @@ class SynonymService:
             return None
         
         try:
-            # Construire le prompt utilisateur
-            if mode == "synonyms":
-                user_prompt = f"Liste des synonymes pour : {word}"
-            elif mode == "antonyms":
-                user_prompt = f"Liste des antonymes pour : {word}"
-            else:  # both
-                user_prompt = (
-                    f"Pour le mot '{word}':\n"
-                    f"- Synonymes: \n"
-                    f"- Antonymes: "
-                )
+            if mode not in ("synonyms", "antonyms", "both"):
+                raise ValueError("Mode de recherche non pris en charge.")
+            if output_format not in ("text", "markdown"):
+                raise ValueError("Format de synonymes non pris en charge.")
+            rules = {
+                "synonyms": "Fournis uniquement les synonymes du mot demandé.",
+                "antonyms": "Fournis uniquement les antonymes du mot demandé.",
+                "both": "Fournis les synonymes et les antonymes dans deux sections distinctes "
+                        "intitulées Synonymes et Antonymes.",
+            }[mode]
+            rules += (
+                " Présente les mots en liste Markdown."
+                if output_format == "markdown" else
+                " Présente les mots séparés par des virgules, en texte brut."
+            )
             
             logger.info(f"Demande de {mode} pour: {word}")
             
             # Appel à l'IA
-            response = self.client.simple_completion(
-                prompt=user_prompt,
-                system_prompt=self.system_prompt,
+            response = self.client.constrained_completion(
+                prompt=source_content("mot", word),
+                system_prompt=build_tool_prompt(
+                    self.system_prompt, output_format, rules, instructions
+                ),
                 temperature=temperature
             )
             
@@ -118,7 +130,9 @@ class SynonymService:
                     ai_response=response,
                     metadata={
                         "mode": mode,
-                        "temperature": temperature or self.client.temperature
+                        "output_format": output_format,
+                        "instructions": instructions,
+                        "temperature": self.client.temperature if temperature is None else temperature
                     }
                 )
                 
@@ -175,4 +189,3 @@ def get_synonym_service(
     if _synonym_service is None:
         _synonym_service = SynonymService(openai_client, history_manager, system_prompt)
     return _synonym_service
-

@@ -6,8 +6,9 @@ Ce module fournit un client pour interagir avec OpenAI et tout service compatibl
 """
 
 import logging
+import json
 from typing import Optional, Dict, Any, List
-from openai import OpenAI, OpenAIError
+from openai import OpenAI, OpenAIError, APIStatusError
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -211,6 +212,70 @@ class OpenAIClient:
             max_tokens=max_tokens
         )
 
+    def constrained_completion(
+        self,
+        prompt: str,
+        system_prompt: str,
+        temperature: Optional[float] = None,
+    ) -> str:
+        """Demande un résultat JSON contraint, si le serveur le supporte."""
+        schema = {
+            "type": "object",
+            "properties": {"result": {"type": "string"}},
+            "required": ["result"],
+            "additionalProperties": False,
+        }
+        parameters = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": self.temperature if temperature is None else temperature,
+        }
+        if self.max_tokens is not None:
+            parameters["max_tokens"] = self.max_tokens
+        try:
+            response = self.client.chat.completions.create(
+                **parameters,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "tool_result", "strict": True, "schema": schema},
+                },
+            )
+        except APIStatusError as exc:
+            error = exc.body.get("error", exc.body) if isinstance(exc.body, dict) else {}
+            message = str(error.get("message", "")).lower() if isinstance(error, dict) else ""
+            unsupported = (
+                exc.status_code in (400, 422)
+                and any(term in message for term in ("response_format", "json_schema", "structured output"))
+                and any(term in message for term in (
+                    "not supported", "unsupported", "does not support",
+                    "unknown", "unrecognized", "not available",
+                ))
+            )
+            if not unsupported:
+                raise
+            logger.warning(
+                "Décodage JSON contraint non pris en charge : repli sur une réponse texte."
+            )
+            response = self.client.chat.completions.create(**parameters)
+            content = response.choices[0].message.content
+            if response.choices[0].finish_reason != "stop" or not content or not content.strip():
+                raise ValueError("Réponse texte vide, refusée ou incomplète.")
+            return content.strip()
+
+        choice = response.choices[0]
+        if choice.finish_reason != "stop" or not choice.message.content:
+            raise ValueError("Réponse structurée vide, refusée ou incomplète.")
+        result = json.loads(choice.message.content)
+        if (
+            not isinstance(result, dict) or set(result) != {"result"}
+            or not isinstance(result["result"], str) or not result["result"].strip()
+        ):
+            raise ValueError("La réponse ne respecte pas le schéma attendu.")
+        return result["result"].strip()
+
     def test_connection(self) -> tuple[bool, str]:
         """
         Test la connexion à l'API.
@@ -334,7 +399,20 @@ def init_openai_client(
         Instance du client OpenAI
     """
     global _openai_client
-    next_client = OpenAIClient(
+    if _openai_client is not None:
+        _openai_client.update_config(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            verify_ssl=verify_ssl,
+        )
+        _openai_client.max_tokens = max_tokens
+        return _openai_client
+
+    _openai_client = OpenAIClient(
         api_key=api_key,
         base_url=base_url,
         model=model,
@@ -343,7 +421,4 @@ def init_openai_client(
         timeout=timeout,
         verify_ssl=verify_ssl
     )
-    if _openai_client is not None:
-        _openai_client.close()
-    _openai_client = next_client
     return _openai_client

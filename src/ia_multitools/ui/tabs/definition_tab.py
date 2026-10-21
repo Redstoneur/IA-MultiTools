@@ -11,6 +11,7 @@ import threading
 from typing import Any
 
 from ...core.config_manager import ConfigManager
+from ..widgets.scrollable_form import ScrollableForm
 from ...services.definition_service import get_definition_service
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class DefinitionTab:
         self.service = get_definition_service()
 
         # Frame principal
-        self.frame = ttk.Frame(parent, padding=15)
+        self.frame = ScrollableForm(parent, padding=15)
 
         self._build_ui()
         logger.debug("Onglet Définition créé")
@@ -46,6 +47,10 @@ class DefinitionTab:
         ttk.Label(input_frame, text="Mot ou concept:").pack(anchor=W, pady=(0, 5))
         self.term_entry = ttk.Entry(input_frame, font=("Segoe UI", 11))
         self.term_entry.pack(fill=X, pady=(0, 10))
+
+        ttk.Label(input_frame, text="Instructions complémentaires (optionnel):").pack(anchor=W)
+        self.instructions_entry = ttk.Entry(input_frame)
+        self.instructions_entry.pack(fill=X, pady=(5, 10))
 
         # Limite de mots
         limit_frame = ttk.Frame(input_frame)
@@ -158,6 +163,8 @@ class DefinitionTab:
 
         # Obtenir le format de sortie
         output_format = self.format_var.get()
+        instructions = self.instructions_entry.get().strip() or None
+        self.service.set_system_prompt(self.config_manager.get_config().prompts.definition)
 
         # Désactiver le bouton pendant le traitement
         self.generate_btn.config(state="disabled", text="⏳ Génération en cours...")
@@ -167,13 +174,16 @@ class DefinitionTab:
         # Lancer dans un thread séparé
         def process():
             try:
-                result = self.service.get_definition(term, word_limit, output_format)
+                result = self.service.get_definition(
+                    term, word_limit=word_limit, output_format=output_format,
+                    instructions=instructions,
+                )
 
                 # Mettre à jour l'UI dans le thread principal
                 self.frame.after(0, lambda: self._update_result(result))
             except Exception as e:
                 logger.error(f"Erreur lors de la génération: {e}")
-                self.frame.after(0, lambda: self._update_result(None, str(e)))
+                self.frame.after(0, lambda error=str(e): self._update_result(None, error))
 
         thread = threading.Thread(target=process, daemon=True)
         thread.start()
@@ -212,6 +222,7 @@ class DefinitionTab:
     def _reset(self) -> None:
         """Réinitialise l'onglet."""
         self.term_entry.delete(0, tk.END)
+        self.instructions_entry.delete(0, tk.END)
         self.word_limit_var.set("")
         self.result_text.delete("1.0", tk.END)
         self.format_var.set("text")

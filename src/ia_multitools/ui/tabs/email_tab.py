@@ -11,6 +11,7 @@ import threading
 from typing import Any
 
 from ...core.config_manager import ConfigManager
+from ..widgets.scrollable_form import ScrollableForm
 from ...services.email_correction_service import get_email_correction_service
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class EmailTab:
         self.service = get_email_correction_service()
 
         # Frame principal
-        self.frame = ttk.Frame(parent, padding=15)
+        self.frame = ScrollableForm(parent, padding=15)
 
         self._build_ui()
         logger.debug("Onglet E-mails créé")
@@ -72,14 +73,20 @@ class EmailTab:
             options_frame,
             text="Rendre professionnel",
             variable=self.make_professional_var
-        ).pack(side=LEFT, padx=(0, 15))
+        ).pack(anchor=W, pady=3)
 
         self.add_greeting_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             options_frame,
             text="Ajouter formule de politesse",
             variable=self.add_greeting_var
-        ).pack(side=LEFT, padx=(0, 15))
+        ).pack(anchor=W, pady=3)
+        self.markdown_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            options_frame,
+            text="Ajouter une mise en forme Markdown",
+            variable=self.markdown_var,
+        ).pack(anchor=W, pady=3)
 
         # Instructions complémentaires
         ttk.Label(input_frame, text="Instructions complémentaires (optionnel):").pack(anchor=W, pady=(5, 5))
@@ -156,6 +163,8 @@ class EmailTab:
         instructions = self.instructions_entry.get().strip() or None
         make_professional = self.make_professional_var.get()
         add_greeting = self.add_greeting_var.get()
+        output_format = "markdown" if self.markdown_var.get() else "text"
+        self.service.set_system_prompt(self.config_manager.get_config().prompts.email_correction)
 
         # Désactiver le bouton pendant le traitement
         self.correct_btn.config(state="disabled", text="⏳ Correction en cours...")
@@ -169,14 +178,15 @@ class EmailTab:
                     content=content,
                     instructions=instructions,
                     make_professional=make_professional,
-                    add_greeting=add_greeting
+                    add_greeting=add_greeting,
+                    output_format=output_format,
                 )
 
                 # Mettre à jour l'UI dans le thread principal
                 self.frame.after(0, lambda: self._update_result(result))
             except Exception as e:
                 logger.error(f"Erreur lors de la correction: {e}")
-                self.frame.after(0, lambda: self._update_result(None, str(e)))
+                self.frame.after(0, lambda error=str(e): self._update_result(None, error))
 
         thread = threading.Thread(target=process, daemon=True)
         thread.start()
@@ -219,3 +229,4 @@ class EmailTab:
         self.result_text.delete("1.0", tk.END)
         self.make_professional_var.set(False)
         self.add_greeting_var.set(True)
+        self.markdown_var.set(False)

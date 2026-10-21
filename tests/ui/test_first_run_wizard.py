@@ -18,20 +18,6 @@ def config_manager():
     return Mock(get_config=Mock(return_value=AppConfig()))
 
 
-@pytest.fixture(scope="module")
-def root():
-    try:
-        window = ttk.Window()
-    except tk.TclError as exc:
-        if "no display name" in str(exc) or "couldn't connect to display" in str(exc):
-            pytest.skip("A graphical display is required for layout tests")
-        raise
-    window.geometry("200x100")
-    window.update()
-    yield window
-    window.destroy()
-
-
 @pytest.fixture
 def wizard(root):
     instance = FirstRunWizard(root, config_manager())

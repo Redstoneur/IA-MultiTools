@@ -41,7 +41,7 @@ def test_get_definition_with_mock():
         with patch('src.ia_multitools.services.definition_service.get_history_manager') as mock_history:
             # Configurer le mock
             mock_client_instance = Mock()
-            mock_client_instance.simple_completion.return_value = "Définition test"
+            mock_client_instance.constrained_completion.return_value = "Définition test"
             mock_client.return_value = mock_client_instance
 
             mock_history_instance = Mock()
@@ -51,10 +51,9 @@ def test_get_definition_with_mock():
             result = service.get_definition("test")
 
             assert result == "Définition test"
-            mock_client_instance.simple_completion.assert_called_once()
+            mock_client_instance.constrained_completion.assert_called_once()
             mock_history_instance.add_entry.assert_called_once()
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

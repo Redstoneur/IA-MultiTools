@@ -14,6 +14,8 @@ from typing import Optional
 
 from ..core.config_manager import ConfigManager
 from ..core.openai_client import OpenAIClient, init_openai_client
+from .widgets.ai_settings import validate_ai_settings
+from .widgets.scrollable_form import ScrollableForm
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +42,11 @@ class SettingsWindow:
         # Créer la fenêtre
         self.window = ttk.Toplevel(parent)
         self.window.title("Paramètres - IA-MultiTools")
-        self.window.geometry("700x600")
-        self.window.minsize(600, 500)
+        width = min(950, self.window.winfo_screenwidth() - 80)
+        height = min(800, self.window.winfo_screenheight() - 100)
+        self.window.geometry(f"{width}x{height}")
+        self.window.minsize(min(600, width), min(400, height))
+        self.window.resizable(True, True)
 
         # Rendre modale
         self.window.transient(parent)
@@ -56,8 +61,13 @@ class SettingsWindow:
         main_container = ttk.Frame(self.window)
         main_container.pack(fill=BOTH, expand=YES, padx=10, pady=10)
 
+        control_frame = ttk.Frame(main_container)
+        control_frame.pack(side=BOTTOM, fill=X)
+        control_frame.columnconfigure((0, 1, 2), weight=1, uniform="actions")
+
         # Créer le notebook pour les sections
         notebook = ttk.Notebook(main_container, bootstyle=INFO)
+        self.notebook = notebook
         notebook.pack(fill=BOTH, expand=YES, pady=(0, 10))
 
         # Onglets
@@ -67,61 +77,59 @@ class SettingsWindow:
         self._build_prompts_tab(notebook)
 
         # Boutons de contrôle
-        control_frame = ttk.Frame(main_container)
-        control_frame.pack(fill=X)
-
         ttk.Button(
             control_frame,
             text="💾 Sauvegarder",
             command=self._save_settings,
             bootstyle=SUCCESS,
-            width=20
-        ).pack(side=LEFT, padx=5)
+        ).grid(row=0, column=0, sticky=EW, padx=5)
 
         ttk.Button(
             control_frame,
             text="🔄 Réinitialiser",
             command=self._reset_to_defaults,
             bootstyle=WARNING,
-            width=20
-        ).pack(side=LEFT, padx=5)
+        ).grid(row=0, column=1, sticky=EW, padx=5)
 
         ttk.Button(
             control_frame,
             text="❌ Annuler",
             command=self.window.destroy,
             bootstyle=SECONDARY,
-            width=20
-        ).pack(side=RIGHT, padx=5)
+        ).grid(row=0, column=2, sticky=EW, padx=5)
 
     def _build_ai_config_tab(self, notebook: ttk.Notebook) -> None:
         """Construit l'onglet de configuration IA."""
-        frame = ttk.Frame(notebook, padding=15)
-        notebook.add(frame, text="🤖 Configuration IA")
+        frame = ScrollableForm(notebook, padding=15)
+        self.ai_form = frame
+        notebook.add(frame.container, text="🤖 Configuration IA")
+        frame.columnconfigure(1, weight=1)
 
         # URL de base
         ttk.Label(frame, text="URL de base de l'API:").grid(row=0, column=0, sticky=W, pady=5)
         self.base_url_var = tk.StringVar(value=self.config.ai.base_url)
-        ttk.Entry(frame, textvariable=self.base_url_var, width=50).grid(row=0, column=1, pady=5, padx=10)
+        ttk.Entry(frame, textvariable=self.base_url_var).grid(row=0, column=1, sticky=EW, pady=5, padx=10)
 
         # Clé API
         ttk.Label(frame, text="Clé API:").grid(row=1, column=0, sticky=W, pady=5)
         self.api_key_var = tk.StringVar(value=self.config.ai.api_key)
-        ttk.Entry(frame, textvariable=self.api_key_var, width=50, show="*").grid(row=1, column=1, pady=5, padx=10)
+        ttk.Entry(frame, textvariable=self.api_key_var, show="*").grid(row=1, column=1, sticky=EW, pady=5, padx=10)
         ttk.Label(
             frame,
             text="La clé API est stockée dans le trousseau système (pas dans le fichier de config).",
-            bootstyle=SECONDARY
+            bootstyle=SECONDARY,
+            wraplength=300,
         ).grid(row=2, column=1, sticky=W, padx=10)
 
         # Modèle
         ttk.Label(frame, text="Modèle:").grid(row=3, column=0, sticky=W, pady=5)
         self.model_var = tk.StringVar(value=self.config.ai.model)
-        ttk.Entry(frame, textvariable=self.model_var, width=50).grid(row=3, column=1, pady=5, padx=10)
+        self.model_entry = ttk.Combobox(frame, textvariable=self.model_var, state="normal")
+        self.model_entry.grid(row=3, column=1, sticky=EW, pady=5, padx=10)
 
         # Température
         ttk.Label(frame, text="Température (0.0 - 2.0):").grid(row=4, column=0, sticky=W, pady=5)
-        self.temperature_var = tk.DoubleVar(value=self.config.ai.temperature)
+        self.temperature_var = tk.StringVar(value=str(self.config.ai.temperature))
         ttk.Spinbox(
             frame,
             from_=0.0,
@@ -133,10 +141,10 @@ class SettingsWindow:
 
         # Timeout
         ttk.Label(frame, text="Timeout (secondes):").grid(row=5, column=0, sticky=W, pady=5)
-        self.timeout_var = tk.IntVar(value=self.config.ai.timeout)
+        self.timeout_var = tk.StringVar(value=str(self.config.ai.timeout))
         ttk.Spinbox(
             frame,
-            from_=10,
+            from_=1,
             to=300,
             increment=10,
             textvariable=self.timeout_var,
@@ -150,6 +158,17 @@ class SettingsWindow:
             text="Vérifier les certificats SSL",
             variable=self.verify_ssl_var
         ).grid(row=6, column=1, pady=10, sticky=W, padx=10)
+        ttk.Label(
+            frame, text="Recommandé : laissez SSL activé. Sinon, HTTPS n'est plus vérifié.",
+            bootstyle=WARNING, wraplength=300,
+        ).grid(row=7, column=1, sticky=W, padx=10)
+        self.models_btn = ttk.Button(
+            frame, text="Charger les modèles disponibles",
+            command=self._load_models, bootstyle=INFO,
+        )
+        self.models_btn.grid(row=8, column=1, sticky=W, padx=10, pady=5)
+        self.status_label = ttk.Label(frame, text="", wraplength=300)
+        self.status_label.grid(row=9, column=1, sticky=EW, padx=10)
 
         # Bouton de test
         ttk.Button(
@@ -157,23 +176,77 @@ class SettingsWindow:
             text="🔍 Tester la connexion",
             command=self._test_connection,
             bootstyle=INFO
-        ).grid(row=7, column=1, pady=10, sticky=W, padx=10)
+        ).grid(row=10, column=1, pady=10, sticky=W, padx=10)
+        for variable in (
+            self.base_url_var, self.api_key_var, self.model_var,
+            self.temperature_var, self.timeout_var, self.verify_ssl_var,
+        ):
+            variable.trace_add("write", self._invalidate_test)
+        for variable in (self.base_url_var, self.api_key_var, self.verify_ssl_var):
+            variable.trace_add("write", self._clear_models)
 
-    def _get_current_ai_signature(self) -> tuple[str, str, str, float, int, bool]:
+    def _get_current_ai_signature(self, require_model=True) -> tuple[str, str, str, float, int, bool]:
         """Retourne une signature des paramètres IA à valider avant sauvegarde."""
-        return (
-            self.base_url_var.get().strip(),
-            self.model_var.get().strip(),
-            self.api_key_var.get().strip(),
+        return validate_ai_settings(
+            self.base_url_var.get(),
+            self.model_var.get(),
+            self.api_key_var.get(),
             self.temperature_var.get(),
             self.timeout_var.get(),
             self.verify_ssl_var.get(),
+            require_model=require_model,
         )
+
+    def _invalidate_test(self, *_args):
+        self._last_successful_test_signature = None
+        self.status_label.configure(text="Paramètres modifiés : testez la connexion.")
+
+    def _clear_models(self, *_args):
+        self.model_entry.configure(values=())
+
+    def _load_models(self):
+        client = None
+        try:
+            base_url, model, api_key, temperature, timeout, verify_ssl = self._get_current_ai_signature(False)
+            self.models_btn.configure(state="disabled")
+            self.status_label.configure(text="Chargement des modèles...")
+            self.window.update_idletasks()
+            client = OpenAIClient(
+                api_key=api_key, base_url=base_url, model=model,
+                temperature=temperature, timeout=timeout, verify_ssl=verify_ssl,
+            )
+            models = sorted(set(client.list_models()))
+            self.model_entry.configure(values=models)
+            if not models:
+                self.status_label.configure(text="Aucun modèle récupéré.")
+                messagebox.showwarning(
+                    "Modèles indisponibles",
+                    "Vérifiez le serveur, l'URL, la clé API et SSL. La saisie manuelle reste possible.",
+                    parent=self.window,
+                )
+                return
+            if model not in models:
+                self.model_var.set(models[0])
+            self.status_label.configure(text=f"{len(models)} modèle(s) disponible(s).")
+        except ValueError as exc:
+            messagebox.showerror("Paramètres invalides", str(exc), parent=self.window)
+        except Exception as exc:
+            logger.error("Erreur de chargement des modèles: %s", type(exc).__name__)
+            self.model_entry.configure(values=())
+            self.status_label.configure(text="Chargement des modèles impossible.")
+            messagebox.showerror(
+                "Erreur", f"Impossible de charger les modèles ({type(exc).__name__}).",
+                parent=self.window,
+            )
+        finally:
+            if client is not None:
+                client.close()
+            self.models_btn.configure(state="normal")
 
     def _build_security_tab(self, notebook: ttk.Notebook) -> None:
         """Construit l'onglet de sécurité."""
-        frame = ttk.Frame(notebook, padding=15)
-        notebook.add(frame, text="🔐 Sécurité")
+        frame = ScrollableForm(notebook, padding=15)
+        notebook.add(frame.container, text="🔐 Sécurité")
 
         ttk.Label(
             frame,
@@ -181,7 +254,7 @@ class SettingsWindow:
                 "Les données sont toujours chiffrées. Le trousseau système est requis "
                 "pour protéger la clé de chiffrement et les clés API."
             ),
-            wraplength=560,
+            wraplength=420,
         ).pack(anchor=W, pady=10)
 
         # Verrouillage de l'application
@@ -208,12 +281,12 @@ class SettingsWindow:
                 text=label,
                 variable=self.auto_lock_var,
                 value=value
-            ).pack(side=LEFT, padx=10)
+            ).pack(anchor=W, pady=3)
 
     def _build_appearance_tab(self, notebook: ttk.Notebook) -> None:
         """Construit l'onglet d'apparence."""
-        frame = ttk.Frame(notebook, padding=15)
-        notebook.add(frame, text="🎨 Apparence")
+        frame = ScrollableForm(notebook, padding=15)
+        notebook.add(frame.container, text="🎨 Apparence")
 
         # Thème
         ttk.Label(frame, text="Thème:").pack(anchor=W, pady=5)
@@ -251,26 +324,14 @@ class SettingsWindow:
         ttk.Label(
             frame,
             text="⚠ Le changement de thème nécessite un redémarrage de l'application.",
-            foreground="orange"
+            foreground="orange",
+            wraplength=420,
         ).pack(anchor=W, pady=20)
 
     def _build_prompts_tab(self, notebook: ttk.Notebook) -> None:
         """Construit l'onglet des prompts système."""
-        frame = ttk.Frame(notebook, padding=15)
-        notebook.add(frame, text="📝 Prompts système")
-
-        # Scrollable frame
-        canvas = tk.Canvas(frame, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(frame, orient=VERTICAL, command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor=NW)
-        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollable_frame = ScrollableForm(notebook, padding=15)
+        notebook.add(scrollable_frame.container, text="📝 Prompts système")
 
         # Prompt Définition
         ttk.Label(scrollable_frame, text="Prompt Définition:", font=("Segoe UI", 10, "bold")).pack(anchor=W, pady=(5, 5))
@@ -296,35 +357,30 @@ class SettingsWindow:
         self.prompt_email_text.insert("1.0", self.config.prompts.email_correction)
         self.prompt_email_text.pack(fill=X, pady=(0, 15))
 
-        canvas.pack(side=LEFT, fill=BOTH, expand=YES)
-        scrollbar.pack(side=RIGHT, fill=Y)
-
     def _test_connection(self) -> bool:
         """Teste la connexion à l'API et retourne True en cas de succès."""
         test_client: Optional[OpenAIClient] = None
+        self._last_successful_test_signature = None
         try:
-            if not self.base_url_var.get().strip() or not self.model_var.get().strip():
-                messagebox.showerror("Erreur", "L'URL de base et le modèle sont obligatoires.")
-                return False
-
+            signature = self._get_current_ai_signature()
+            base_url, model, api_key, temperature, timeout, verify_ssl = signature
             test_client = OpenAIClient(
-                api_key=self.api_key_var.get().strip(),
-                base_url=self.base_url_var.get().strip(),
-                model=self.model_var.get().strip(),
-                temperature=self.temperature_var.get(),
-                timeout=self.timeout_var.get(),
-                verify_ssl=self.verify_ssl_var.get()
+                api_key=api_key, base_url=base_url, model=model,
+                temperature=temperature, timeout=timeout, verify_ssl=verify_ssl,
             )
 
             success, message = test_client.test_connection()
 
             if success:
-                self._last_successful_test_signature = self._get_current_ai_signature()
+                self._last_successful_test_signature = signature
                 messagebox.showinfo("Test de connexion", "✓ Connexion réussie!")
                 return True
             else:
                 messagebox.showerror("Test de connexion", f"✗ Échec de la connexion:\n\n{message}")
                 return False
+        except ValueError as exc:
+            messagebox.showerror("Paramètres invalides", str(exc), parent=self.window)
+            return False
         except Exception as e:
             logger.error("Erreur de création du client de test: %s", type(e).__name__)
             messagebox.showerror(
@@ -357,8 +413,8 @@ class SettingsWindow:
             self.config.ai.api_key = self.api_key_var.get().strip()
             self.config.ai.base_url = self.base_url_var.get().strip()
             self.config.ai.model = self.model_var.get().strip()
-            self.config.ai.temperature = self.temperature_var.get()
-            self.config.ai.timeout = self.timeout_var.get()
+            self.config.ai.temperature = current_signature[3]
+            self.config.ai.timeout = current_signature[4]
             self.config.ai.verify_ssl = self.verify_ssl_var.get()
 
             self.config.security.encryption_enabled = True
@@ -406,6 +462,10 @@ class SettingsWindow:
             messagebox.showinfo("Succès", "Les paramètres ont été sauvegardés avec succès!")
             logger.info("Paramètres sauvegardés")
 
+        except ValueError as exc:
+            self.config_manager.config = previous_config
+            self.config = previous_config
+            messagebox.showerror("Paramètres invalides", str(exc), parent=self.window)
         except Exception as e:
             if not saved:
                 self.config_manager.config = previous_config

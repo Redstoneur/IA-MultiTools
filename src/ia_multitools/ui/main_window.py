@@ -58,8 +58,10 @@ class MainWindow:
             themename=self.config.appearance.theme
         )
 
-        self.root.geometry("1000x700")
-        self.root.minsize(800, 600)
+        width = min(1000, self.root.winfo_screenwidth() - 80)
+        height = min(700, self.root.winfo_screenheight() - 100)
+        self.root.geometry(f"{width}x{height}")
+        self.root.minsize(min(800, width), min(400, height))
 
         self.logo_image: Optional[tk.PhotoImage] = None
         self._setup_branding()
@@ -185,19 +187,19 @@ class MainWindow:
         """Crée tous les onglets de l'application."""
         # Onglet Définition
         self.definition_tab = DefinitionTab(self.notebook, self.config_manager)
-        self.notebook.add(self.definition_tab.frame, text="📖 Définition")
+        self.notebook.add(self.definition_tab.frame.container, text="📖 Définition")
 
         # Onglet Synonymes
         self.synonym_tab = SynonymTab(self.notebook, self.config_manager)
-        self.notebook.add(self.synonym_tab.frame, text="🔄 Synonymes")
+        self.notebook.add(self.synonym_tab.frame.container, text="🔄 Synonymes")
 
         # Onglet Correction de texte
         self.correction_tab = CorrectionTab(self.notebook, self.config_manager)
-        self.notebook.add(self.correction_tab.frame, text="✏️ Correction")
+        self.notebook.add(self.correction_tab.frame.container, text="✏️ Correction")
 
         # Onglet E-mails
         self.email_tab = EmailTab(self.notebook, self.config_manager)
-        self.notebook.add(self.email_tab.frame, text="📧 E-mails")
+        self.notebook.add(self.email_tab.frame.container, text="📧 E-mails")
 
         logger.debug("Tous les onglets ont été créés")
 

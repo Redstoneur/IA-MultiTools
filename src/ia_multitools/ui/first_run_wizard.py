@@ -13,6 +13,7 @@ from typing import Any, Optional, Callable
 
 from ..core.config_manager import ConfigManager
 from ..core.openai_client import OpenAIClient
+from .widgets.ai_settings import validate_ai_settings
 
 logger = logging.getLogger(__name__)
 
@@ -247,27 +248,10 @@ class FirstRunWizard:
         self.model_entry.configure(values=())
 
     def _get_ai_signature(self, require_model: bool = True) -> tuple[str, str, str, float, int, bool]:
-        base_url = self.base_url_var.get().strip()
-        model = self.model_var.get().strip()
-        if not base_url:
-            raise ValueError("Veuillez entrer l'URL de base.")
-        if require_model and not model:
-            raise ValueError("Veuillez entrer ou sélectionner le nom du modèle.")
-        try:
-            temperature = float(self.temperature_var.get())
-        except ValueError as exc:
-            raise ValueError("La température doit être un nombre entre 0 et 2.") from exc
-        if not 0 <= temperature <= 2:
-            raise ValueError("La température doit être comprise entre 0 et 2.")
-        try:
-            timeout = int(self.timeout_var.get())
-        except ValueError as exc:
-            raise ValueError("Le timeout doit être un nombre entier positif de secondes.") from exc
-        if timeout <= 0:
-            raise ValueError("Le timeout doit être supérieur à zéro.")
-        return (
-            base_url, model, self.api_key_var.get().strip(),
-            temperature, timeout, self.verify_ssl_var.get(),
+        return validate_ai_settings(
+            self.base_url_var.get(), self.model_var.get(), self.api_key_var.get(),
+            self.temperature_var.get(), self.timeout_var.get(), self.verify_ssl_var.get(),
+            require_model=require_model,
         )
 
     def _load_models(self) -> None:

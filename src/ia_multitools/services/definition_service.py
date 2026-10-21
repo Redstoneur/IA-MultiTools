@@ -8,6 +8,7 @@ import logging
 from typing import Optional
 from ..core.openai_client import OpenAIClient, get_openai_client
 from ..core.history_manager import HistoryManager, get_history_manager
+from .output_rules import build_tool_prompt, source_content
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,10 @@ class DefinitionService:
         self,
         term: str,
         word_limit: Optional[int] = None,
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
+        *,
+        output_format: str = "text",
+        instructions: Optional[str] = None,
     ) -> Optional[str]:
         """
         Obtient la définition d'un terme.
@@ -78,6 +82,8 @@ class DefinitionService:
             term: Mot ou concept à définir
             word_limit: Limite optionnelle du nombre de mots
             temperature: Température pour la génération
+            output_format: Texte brut ou Markdown
+            instructions: Précisions complémentaires sur la définition
         
         Returns:
             Définition ou None en cas d'erreur
@@ -87,18 +93,21 @@ class DefinitionService:
             return None
         
         try:
+            if output_format not in ("text", "markdown"):
+                raise ValueError("Format de définition non pris en charge.")
             # Construire le prompt utilisateur
-            user_prompt = f"Définis le terme : {term}"
-            
+            rules = "Fournis une seule définition du terme demandé."
             if word_limit and word_limit > 0:
-                user_prompt += f"\n\nLimite ta réponse à {word_limit} mots maximum."
+                rules += f" Limite la définition à {word_limit} mots maximum."
             
             logger.info(f"Demande de définition: {term}")
             
             # Appel à l'IA
-            response = self.client.simple_completion(
-                prompt=user_prompt,
-                system_prompt=self.system_prompt,
+            response = self.client.constrained_completion(
+                prompt=source_content("terme", term),
+                system_prompt=build_tool_prompt(
+                    self.system_prompt, output_format, rules, instructions
+                ),
                 temperature=temperature
             )
             
@@ -110,7 +119,9 @@ class DefinitionService:
                     ai_response=response,
                     metadata={
                         "word_limit": word_limit,
-                        "temperature": temperature or self.client.temperature
+                        "output_format": output_format,
+                        "instructions": instructions,
+                        "temperature": self.client.temperature if temperature is None else temperature
                     }
                 )
                 
@@ -167,4 +178,3 @@ def get_definition_service(
     if _definition_service is None:
         _definition_service = DefinitionService(openai_client, history_manager, system_prompt)
     return _definition_service
-

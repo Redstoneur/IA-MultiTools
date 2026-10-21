@@ -39,6 +39,38 @@ Le chargement des modèles utilise votre URL, votre clé API et vos réglages
 SSL/timeout ; il ne garantit pas que chaque modèle prend en charge la génération
 de texte. Testez la connexion avec le modèle choisi avant d'enregistrer.
 
+Ces mêmes réglages et la liste des modèles sont disponibles dans **Paramètres**.
+Les sections des paramètres et les quatre outils disposent d'un défilement
+vertical pour accéder aux champs et aux résultats sur un petit écran.
+Les changements de configuration IA s'appliquent aux outils déjà ouverts,
+sans redémarrage.
+
+Les outils demandent une sortie structurée avec `response_format: json_schema`
+(décodage contraint côté serveur lorsque celui-ci le prend en charge).
+L'application valide la structure JSON et affiche uniquement le résultat, sans
+son enveloppe JSON. Si le serveur refuse explicitement cette fonctionnalité,
+un avertissement est journalisé et la requête est réessayée en texte libre ;
+les autres erreurs ne déclenchent pas ce repli. Un schéma garantit la structure,
+pas la justesse linguistique du contenu.
+
+**Correction** demande une seule version corrigée, sans liste de variantes ni
+explications. L'option **Ajouter une mise en forme Markdown**, désactivée par
+défaut, permet d'ajouter du formatage à cette version.
+
+Les quatre outils transmettent les instructions complémentaires et le prompt
+personnalisé enregistré dans les paramètres à chaque requête. Les options de
+format et de tâche sélectionnées priment sur les anciennes consignes
+contradictoires. Markdown produit du balisage dans le résultat copiable ; les
+zones de résultat affichent ce balisage en texte, sans rendu HTML.
+
+Dans **E-mails**, Markdown est également disponible et désactivé par défaut.
+« Rendre professionnel » décoché conserve le registre d'origine ; coché,
+il professionnalise sans remplacer le tutoiement par le vouvoiement.
+« Ajouter formule de politesse » décoché interdit d'ajouter des salutations
+ou clôtures mais conserve celles déjà présentes. Comme toute consigne
+linguistique, ces règles restent dépendantes du modèle ; le schéma JSON ne
+garantit pas leur respect sémantique.
+
 ## 🔐 Sécurité
 
 - Chiffrement Fernet avec une clé aléatoire conservée dans le trousseau système
