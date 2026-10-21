@@ -14,6 +14,11 @@ Application desktop Python multiplateforme proposant plusieurs outils linguistiq
 - 🔄 **Synonymes/Antonymes** : Alternatives lexicales
 - ✏️ **Correction de texte** : Correction orthographique et grammaticale
 - 📧 **E-mails professionnels** : Amélioration de vos communications
+- 📟 **Correction et traduction** : Correction dans la langue source, puis traduction
+  vers une langue cible sélectionnable ou saisie librement, avec instructions
+  complémentaires facultatives et option Markdown désactivée par défaut.
+  Le traitement effectue deux requêtes successives ; seule la traduction finale
+  est affichée et ajoutée à l'historique. Le prompt est modifiable dans Paramètres.
 
 ## 🚀 Démarrage rapide
 
@@ -40,7 +45,7 @@ SSL/timeout ; il ne garantit pas que chaque modèle prend en charge la générat
 de texte. Testez la connexion avec le modèle choisi avant d'enregistrer.
 
 Ces mêmes réglages et la liste des modèles sont disponibles dans **Paramètres**.
-Les sections des paramètres et les quatre outils disposent d'un défilement
+Les sections des paramètres et les cinq outils disposent d'un défilement
 vertical pour accéder aux champs et aux résultats sur un petit écran.
 Les changements de configuration IA s'appliquent aux outils déjà ouverts,
 sans redémarrage.
@@ -57,7 +62,7 @@ pas la justesse linguistique du contenu.
 explications. L'option **Ajouter une mise en forme Markdown**, désactivée par
 défaut, permet d'ajouter du formatage à cette version.
 
-Les quatre outils transmettent les instructions complémentaires et le prompt
+Les cinq outils transmettent les instructions complémentaires et le prompt
 personnalisé enregistré dans les paramètres à chaque requête. Les options de
 format et de tâche sélectionnées priment sur les anciennes consignes
 contradictoires. Markdown produit du balisage dans le résultat copiable ; les

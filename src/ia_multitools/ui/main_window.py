@@ -20,6 +20,7 @@ from .tabs.definition_tab import DefinitionTab
 from .tabs.synonym_tab import SynonymTab
 from .tabs.correction_tab import CorrectionTab
 from .tabs.email_tab import EmailTab
+from .tabs.translation_tab import TranslationTab
 from .settings_window import SettingsWindow
 from .first_run_wizard import FirstRunWizard
 
@@ -200,6 +201,8 @@ class MainWindow:
         # Onglet E-mails
         self.email_tab = EmailTab(self.notebook, self.config_manager)
         self.notebook.add(self.email_tab.frame.container, text="📧 E-mails")
+        self.translation_tab = TranslationTab(self.notebook, self.config_manager)
+        self.notebook.add(self.translation_tab.frame.container, text="Traduction")
 
         logger.debug("Tous les onglets ont été créés")
 

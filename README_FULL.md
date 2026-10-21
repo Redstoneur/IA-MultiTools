@@ -15,8 +15,14 @@ Application desktop Python multiplateforme proposant plusieurs outils linguistiq
 
 - **📖 Définition** : Obtenez des définitions claires et concises de mots ou concepts
 - **🔄 Synonymes et Antonymes** : Trouvez rapidement des alternatives lexicales
-- **✏️ Correction de texte** : Corrigez orthographe, grammaire et style
-- **📧 Correction d'e-mails** : Professionnalisez vos communications électroniques
+- **✏️ Correction de texte** : Corrigez orthographe, grammaire et ponctuation en une seule version
+- **📧 Correction d'e-mails** : Corrigez vos messages en conservant leur ton ou en les professionnalisant
+- **📟 Correction et traduction** : Corrigez le texte dans sa langue source, puis traduisez la version corrigée vers la langue de votre choix
+
+Les cinq outils proposent des instructions complémentaires facultatives et une
+sortie en texte brut ou Markdown. Les panneaux et les sections des paramètres
+disposent d'un défilement vertical ; la navigation au clavier rend le champ actif
+accessible même sur un petit écran.
 
 ### Caractéristiques techniques
 
@@ -85,22 +91,27 @@ python -m src.ia_multitools.main --debug
 
 ### Configuration initiale
 
-Au premier lancement :
-1. Accédez aux **Paramètres** (bouton ou menu)
-2. Configurez la **connexion IA** :
-   - **URL de base** : `http://127.0.0.1:1234/v1` (exemple pour LM Studio)
-   - **Clé API** : votre clé (ou `sk-dummy` pour services locaux)
-   - **Modèle** : nom du modèle (ex: `meta-llama-3.1-8b-instruct`)
-   - **Température** : 0.2 (recommandé pour précision)
-3. Sauvegardez
+Au premier lancement, un assistant redimensionnable et défilant s'ouvre :
+1. Renseignez l'**URL de base**, par exemple `http://127.0.0.1:1234/v1`, et la **clé API** si le serveur l'exige.
+2. Cliquez sur **Charger les modèles disponibles**, puis choisissez un modèle dans la liste déroulante. La saisie manuelle reste possible.
+3. Réglez la **température** (0 à 2, valeur initiale 0.2), le **timeout** en secondes et la **vérification SSL**, activée par défaut et recommandée.
+4. Testez la connexion avec ces réglages, puis enregistrez.
+
+Le chargement des modèles utilise l'URL, la clé API et les réglages SSL/timeout
+actuels. La présence d'un modèle dans la liste ne garantit pas qu'il prend en
+charge la génération de texte.
+
+Les mêmes réglages sont accessibles dans **Paramètres → Configuration IA**.
+Toute modification nécessite une nouvelle validation avant sauvegarde. La
+configuration enregistrée s'applique aux outils déjà ouverts, sans redémarrage.
 
 ### Utilisation des outils
 
 #### Outil Définition
 1. Onglet **Définition**
 2. Saisissez un mot ou concept
-3. Optionnel : limitez le nombre de mots
-4. Cliquez sur **Générer**
+3. Optionnel : limitez le nombre de mots, précisez vos instructions et choisissez Texte ou Markdown
+4. Choisissez Texte ou Markdown et ajoutez des instructions complémentaires si besoin, puis cliquez sur **Générer**
 5. Copiez le résultat si besoin
 
 #### Outil Synonymes
@@ -113,18 +124,48 @@ Au premier lancement :
 #### Outil Correction de texte
 1. Onglet **Correction**
 2. Collez votre texte
-3. Ajoutez des instructions optionnelles
+3. Ajoutez des instructions optionnelles et activez **Ajouter une mise en forme Markdown** si souhaité (désactivé par défaut)
 4. Cliquez sur **Corriger**
-5. Récupérez le texte corrigé
+5. Récupérez une seule version corrigée, sans variantes ni explications
 
 #### Outil E-mails
 1. Onglet **E-mails**
 2. Rédigez ou collez votre e-mail
-3. Activez les options :
-   - Rendre professionnel
-   - Ajouter formule de politesse
+3. Choisissez les options :
+   - **Rendre professionnel** : décoché par défaut, conserve le registre d'origine ; coché, professionnalise sans remplacer le tutoiement par le vouvoiement.
+   - **Ajouter formule de politesse** : décoché par défaut ; décoché, interdit d'ajouter des salutations ou clôtures, mais conserve celles déjà présentes.
+   - **Ajouter une mise en forme Markdown** : désactivé par défaut.
 4. Ajoutez des instructions spécifiques si besoin
 5. Cliquez sur **Corriger**
+
+#### Outil Correction et traduction
+1. Ouvrez l'onglet **Traduction** et collez le texte à traiter.
+2. Sélectionnez une **langue cible** dans la liste ou saisissez une autre langue. La valeur initiale est **Anglais** ; la langue source est détectée automatiquement.
+3. Ajoutez des instructions complémentaires facultatives et activez Markdown si souhaité (désactivé par défaut).
+4. Cliquez sur **Corriger et traduire**.
+5. Copiez la traduction finale si besoin.
+
+Le traitement effectue deux requêtes successives : correction dans la langue
+source, puis traduction du texte corrigé. Seule la traduction finale est affichée
+et enregistrée dans l'historique. Si une étape échoue, aucun résultat partiel
+n'est enregistré. **Réinitialiser** vide les champs et rétablit Anglais et le
+Markdown désactivé.
+
+#### Instructions, format et réponses structurées
+
+Les instructions complémentaires et le prompt personnalisé de chaque outil
+sont transmis à chaque requête. Les options explicites sélectionnées priment
+sur les anciennes consignes contradictoires. Markdown produit du balisage
+copiable ; les zones de résultat affichent ce balisage en texte, sans rendu HTML.
+
+Les outils demandent une sortie structurée avec `response_format: json_schema`
+pour permettre un décodage contraint côté serveur lorsque celui-ci le prend en
+charge. L'application valide la structure et affiche uniquement le résultat,
+sans enveloppe JSON. Si le serveur indique explicitement que cette fonctionnalité
+n'est pas prise en charge, un avertissement est journalisé et la requête est
+réessayée en texte libre. Les autres erreurs ne déclenchent pas ce repli.
+Le schéma contraint la structure, pas la justesse linguistique ni le respect
+sémantique de toutes les consignes, qui restent dépendants du modèle.
 
 ## 🔐 Sécurité
 
@@ -179,6 +220,8 @@ La validation des certificats TLS est activée par défaut. Ne désactivez `OPEN
 ### Prompts système personnalisables
 
 Depuis l'interface **Paramètres → Prompts système**, vous pouvez personnaliser les instructions données à l'IA pour chaque outil.
+Cela inclut **Correction et traduction**. Les outils relisent le prompt enregistré
+avant chaque traitement ; il n'est pas nécessaire de les fermer puis de les rouvrir.
 
 ### Compatibilité API OpenAI
 
@@ -208,7 +251,9 @@ src/ia_multitools/
 │   ├── definition_service.py
 │   ├── synonym_service.py
 │   ├── text_correction_service.py
-│   └── email_correction_service.py
+│   ├── email_correction_service.py
+│   ├── translation_service.py  # Correction puis traduction
+│   └── output_rules.py         # Règles de sortie communes
 ├── ui/                        # Interface utilisateur
 │   ├── main_window.py         # Fenêtre principale
 │   ├── settings_window.py     # Fenêtre paramètres
@@ -228,19 +273,33 @@ src/ia_multitools/
 
 ## 🔨 Build et distribution
 
-### Build PyInstaller
+### Scripts de build PyInstaller
+
+Installez les dépendances de développement :
+
+```bash
+python -m pip install -e ".[dev]"
+```
 
 **Windows :**
 ```bash
-pyinstaller --onefile --windowed --name IA-MultiTools --icon=assets/logo.ico src/ia_multitools/main.py
+.\build.bat
 ```
 
 **Linux :**
 ```bash
-pyinstaller --onefile --windowed --name IA-MultiTools src/ia_multitools/main.py
+sh build.sh
 ```
 
-L'exécutable sera dans le dossier `dist/`.
+Les scripts utilisent l'environnement virtuel actif, sinon `.venv` s'il existe,
+puis le Python système, et appellent `build.py` depuis la racine du dépôt.
+L'exécutable sera dans `dist/`. Pour nettoyer les fichiers de compilation :
+`.\build.bat clean` sous Windows ou `sh build.sh clean` sous Linux.
+
+Le workflow de release utilise ces mêmes scripts et joint les archives Windows
+et Linux à chaque release publiée. Les caches, les fichiers de build, les archives
+locales, `data/`, `logs/` et les fichiers `.env` privés sont ignorés par Git ;
+`.env.example` reste versionné.
 
 ## 🧪 Tests
 

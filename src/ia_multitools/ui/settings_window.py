@@ -356,6 +356,13 @@ class SettingsWindow:
         self.prompt_email_text = tk.Text(scrollable_frame, height=4, wrap=tk.WORD)
         self.prompt_email_text.insert("1.0", self.config.prompts.email_correction)
         self.prompt_email_text.pack(fill=X, pady=(0, 15))
+        ttk.Label(
+            scrollable_frame, text="Prompt Correction et traduction:",
+            font=("Segoe UI", 10, "bold"),
+        ).pack(anchor=W, pady=(5, 5))
+        self.prompt_translation_text = tk.Text(scrollable_frame, height=4, wrap=tk.WORD)
+        self.prompt_translation_text.insert("1.0", self.config.prompts.translation)
+        self.prompt_translation_text.pack(fill=X, pady=(0, 15))
 
     def _test_connection(self) -> bool:
         """Teste la connexion à l'API et retourne True en cas de succès."""
@@ -429,6 +436,7 @@ class SettingsWindow:
             self.config.prompts.synonym = self.prompt_synonym_text.get("1.0", tk.END).strip()
             self.config.prompts.text_correction = self.prompt_text_correction_text.get("1.0", tk.END).strip()
             self.config.prompts.email_correction = self.prompt_email_text.get("1.0", tk.END).strip()
+            self.config.prompts.translation = self.prompt_translation_text.get("1.0", tk.END).strip()
 
             # Valider la configuration
             valid, errors = self.config_manager.validate()

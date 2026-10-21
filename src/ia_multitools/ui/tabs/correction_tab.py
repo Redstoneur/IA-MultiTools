@@ -20,6 +20,13 @@ logger = logging.getLogger(__name__)
 class CorrectionTab:
     """Onglet pour l'outil de correction de texte."""
 
+    ACTION_TEXT = "✓ Corriger"
+    RESULT_TITLE = "Texte corrigé"
+    PROMPT_NAME = "text_correction"
+
+    def _get_service(self):
+        return get_text_correction_service()
+
     def __init__(self, parent: Any, config_manager: ConfigManager) -> None:
         """
         Initialise l'onglet de correction.
@@ -29,7 +36,7 @@ class CorrectionTab:
             config_manager: Gestionnaire de configuration
         """
         self.config_manager = config_manager
-        self.service = get_text_correction_service()
+        self.service = self._get_service()
 
         # Frame principal
         self.frame = ScrollableForm(parent, padding=15)
@@ -74,6 +81,7 @@ class CorrectionTab:
             text="Ajouter une mise en forme Markdown",
             variable=self.markdown_var,
         ).pack(anchor=W, pady=(10, 0))
+        self._build_extra_options(input_frame)
 
         # Boutons d'action
         action_frame = ttk.Frame(self.frame)
@@ -81,7 +89,7 @@ class CorrectionTab:
 
         self.correct_btn = ttk.Button(
             action_frame,
-            text="✓ Corriger",
+            text=self.ACTION_TEXT,
             command=self._correct_text,
             bootstyle=SUCCESS,
             width=25
@@ -105,7 +113,7 @@ class CorrectionTab:
         ).pack(side=LEFT, padx=5)
 
         # Section résultat
-        result_frame = ttk.Labelframe(self.frame, text="Texte corrigé", padding=10)
+        result_frame = ttk.Labelframe(self.frame, text=self.RESULT_TITLE, padding=10)
         result_frame.pack(fill=BOTH, expand=YES)
 
         # Zone de texte de résultat avec scrollbar
@@ -128,6 +136,12 @@ class CorrectionTab:
         self.result_text.pack(side=LEFT, fill=BOTH, expand=YES)
         scrollbar_result.config(command=self.result_text.yview)
 
+    def _build_extra_options(self, _parent) -> None:
+        """Point d'extension pour les options de correction spécialisées."""
+
+    def _request_options(self) -> dict:
+        return {}
+
     def _correct_text(self) -> None:
         """Corrige le texte."""
         text = self.input_text.get("1.0", tk.END).strip()
@@ -144,7 +158,14 @@ class CorrectionTab:
 
         instructions = self.instructions_entry.get().strip() or None
         output_format = "markdown" if self.markdown_var.get() else "text"
-        self.service.set_system_prompt(self.config_manager.get_config().prompts.text_correction)
+        try:
+            extra_options = self._request_options()
+        except ValueError as exc:
+            messagebox.showerror("Options invalides", str(exc))
+            return
+        self.service.set_system_prompt(
+            getattr(self.config_manager.get_config().prompts, self.PROMPT_NAME)
+        )
 
         # Désactiver le bouton pendant le traitement
         self.correct_btn.config(state="disabled", text="⏳ Correction en cours...")
@@ -155,7 +176,8 @@ class CorrectionTab:
         def process():
             try:
                 result = self.service.correct_text(
-                    text, instructions=instructions, output_format=output_format
+                    text, instructions=instructions, output_format=output_format,
+                    **extra_options,
                 )
 
                 # Mettre à jour l'UI dans le thread principal
@@ -175,7 +197,7 @@ class CorrectionTab:
             result: Résultat à afficher
             error: Message d'erreur optionnel
         """
-        self.correct_btn.config(state="normal", text="✓ Corriger")
+        self.correct_btn.config(state="normal", text=self.ACTION_TEXT)
         self.result_text.delete("1.0", tk.END)
 
         if error:

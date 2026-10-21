@@ -71,7 +71,7 @@ class EmailCorrectionService:
         content: str,
         instructions: Optional[str] = None,
         make_professional: bool = False,
-        add_greeting: bool = True,
+        add_greeting: bool = False,
         output_format: str = "text",
         temperature: Optional[float] = None
     ) -> Optional[str]:

@@ -69,6 +69,11 @@ class LoggingConfig:
 @dataclass
 class SystemPrompts:
     """Prompts système pour chaque outil."""
+    translation: str = (
+        "Tu es un correcteur et traducteur. Corrige d'abord le texte dans sa langue "
+        "d'origine, puis traduis la version corrigée dans la langue demandée. "
+        "Respecte le sens, le ton et les instructions complémentaires compatibles."
+    )
     definition: str = field(default=(
         "Tu es un assistant spécialisé dans les définitions. "
         "Fournis une définition claire, concise et précise du terme demandé. "

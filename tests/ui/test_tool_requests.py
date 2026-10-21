@@ -85,6 +85,7 @@ def test_ui_sends_numeric_temperature_and_selected_format(root, monkeypatch, kin
             tab._correct_text()
         else:
             assert tab.markdown_var.get() is False
+            assert tab.add_greeting_var.get() is False
             tab.markdown_var.set(output_format == "markdown")
             tab.input_text.insert("1.0", "Salut, tu peux me transmettre le document ?")
             tab.make_professional_var.set(False)
@@ -113,7 +114,9 @@ def test_ui_sends_numeric_temperature_and_selected_format(root, monkeypatch, kin
             assert "Option politesse DÉSACTIVÉE" in prompt
             assert "Conserve impérativement le tutoiement" in prompt
             assert "Conserve celles déjà présentes" in prompt
+            tab.add_greeting_var.set(True)
             tab._reset()
+            assert tab.add_greeting_var.get() is False
             assert tab.markdown_var.get() is False
         if kind in ("email", "correction"):
             assert tab.instructions_entry.get() == ""

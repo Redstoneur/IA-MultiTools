@@ -75,7 +75,7 @@ class EmailTab:
             variable=self.make_professional_var
         ).pack(anchor=W, pady=3)
 
-        self.add_greeting_var = tk.BooleanVar(value=True)
+        self.add_greeting_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             options_frame,
             text="Ajouter formule de politesse",
@@ -228,5 +228,5 @@ class EmailTab:
         self.instructions_entry.delete(0, tk.END)
         self.result_text.delete("1.0", tk.END)
         self.make_professional_var.set(False)
-        self.add_greeting_var.set(True)
+        self.add_greeting_var.set(False)
         self.markdown_var.set(False)
