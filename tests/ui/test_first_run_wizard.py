@@ -28,7 +28,8 @@ def wizard(root):
 def assert_inside(widget, container):
     assert widget.winfo_ismapped()
     assert widget.winfo_width() > 20
-    assert widget.winfo_height() > 20
+    assert widget.winfo_height() > 1
+    assert widget.winfo_height() >= widget.winfo_reqheight()
     assert widget.winfo_rootx() >= container.winfo_rootx()
     assert widget.winfo_rooty() >= container.winfo_rooty()
     assert (
@@ -39,6 +40,29 @@ def assert_inside(widget, container):
         widget.winfo_rooty() + widget.winfo_height()
         <= container.winfo_rooty() + container.winfo_height()
     )
+
+
+@pytest.mark.parametrize("height", [15, 19, 24])
+def test_visibility_check_accepts_native_widget_heights(height):
+    widget = Mock()
+    widget.winfo_ismapped.return_value = True
+    widget.winfo_width.return_value = 100
+    widget.winfo_height.return_value = height
+    widget.winfo_reqheight.return_value = height
+    widget.winfo_rootx.return_value = 0
+    widget.winfo_rooty.return_value = 0
+    assert_inside(widget, widget)
+
+
+@pytest.mark.parametrize("height", [1, 14])
+def test_visibility_check_rejects_clipped_widget_height(height):
+    widget = Mock()
+    widget.winfo_ismapped.return_value = True
+    widget.winfo_width.return_value = 100
+    widget.winfo_height.return_value = height
+    widget.winfo_reqheight.return_value = 15
+    with pytest.raises(AssertionError):
+        assert_inside(widget, widget)
 
 
 @pytest.mark.parametrize("geometry", ["500x400", "700x550", "900x760"])

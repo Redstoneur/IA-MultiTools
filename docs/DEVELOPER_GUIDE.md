@@ -53,11 +53,8 @@ venv\Scripts\activate
 # Linux:
 source venv/bin/activate
 
-# Installer les dépendances
-pip install -r requirements.txt
-
-# Installer les outils de développement
-pip install pytest pytest-cov black mypy pylint
+# Installer l'application et les outils de développement
+python -m pip install -r requirements-dev.txt
 ```
 
 ### Configuration
@@ -291,7 +288,7 @@ def test_with_mock():
 Installez les dépendances dans un environnement Python 3.12 ou supérieur :
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -r requirements-dev.txt
 ```
 
 Sous Windows, lancez `.\build.bat`. Sous Linux, lancez `sh build.sh`.

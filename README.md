@@ -90,7 +90,7 @@ Voir [README_FULL.md](README_FULL.md) pour la documentation complète.
 
 ## 📦 Construire un exécutable
 
-Installez les dépendances de développement avec `python -m pip install -e ".[dev]"`,
+Installez les dépendances de développement avec `python -m pip install -r requirements-dev.txt`,
 puis lancez `.\build.bat` sous Windows ou `sh build.sh` sous Linux.
 Les scripts utilisent l'environnement virtuel actif, sinon `.venv` s'il existe,
 et transmettent les arguments à `build.py`.

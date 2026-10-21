@@ -280,7 +280,7 @@ src/ia_multitools/
 Installez les dépendances de développement :
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -r requirements-dev.txt
 ```
 
 **Windows :**
