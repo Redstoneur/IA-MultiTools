@@ -293,7 +293,7 @@ Pour créer un exécutable:
 **Windows:**
 
 ```bash
-pyinstaller --onefile --windowed --name IA-MultiTools --icon=assets/icon.ico src/ia_multitools/main.py
+pyinstaller --onefile --windowed --name IA-MultiTools --icon=assets/logo.ico src/ia_multitools/main.py
 ```
 
 **Linux:**
@@ -356,7 +356,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icon.ico'  # Windows
+    icon='assets/logo.ico'  # Windows
 )
 ```
 
@@ -405,4 +405,3 @@ Exemple:
 ## Support
 
 Pour toute question, ouvrez une Issue sur GitHub ou consultez CONTRIBUTING.md.
-

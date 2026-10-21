@@ -111,7 +111,6 @@ class TextCorrectionService:
                     metadata={
                         "instructions": instructions,
                         "text_length": len(text),
-                        "output_format": output_format,
                         "temperature": temperature or self.client.temperature
                     }
                 )

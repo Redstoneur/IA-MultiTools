@@ -21,6 +21,14 @@ def test_key_generation():
     assert len(key) > 0
 
 
+def test_key_generation_is_random_for_the_same_user():
+    """Une même identité utilisateur ne doit pas permettre de reproduire la clé."""
+    first_key = EncryptionManager(user_identifier="same-user").generate_key()
+    second_key = EncryptionManager(user_identifier="same-user").generate_key()
+
+    assert first_key != second_key
+
+
 def test_encrypt_decrypt():
     """Test de chiffrement et déchiffrement."""
     manager = EncryptionManager()
@@ -68,4 +76,3 @@ def test_invalid_decryption():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

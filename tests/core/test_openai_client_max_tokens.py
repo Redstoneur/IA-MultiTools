@@ -6,11 +6,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from typing import Optional
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-from ia_multitools.core.openai_client import OpenAIClient
+from src.ia_multitools.core.openai_client import OpenAIClient
 
 
 class TestSimpleCompletionMaxTokens:
@@ -19,7 +15,7 @@ class TestSimpleCompletionMaxTokens:
     @pytest.fixture
     def mock_openai_client(self):
         """Fixture pour créer un client mocké"""
-        with patch('ia_multitools.core.openai_client.OpenAI') as mock_openai:
+        with patch('src.ia_multitools.core.openai_client.OpenAI') as mock_openai:
             mock_instance = MagicMock()
             mock_openai.return_value = mock_instance
 
@@ -172,7 +168,7 @@ class TestSimpleCompletionSignature:
         import inspect
 
         # Créer un client temporaire
-        with patch('ia_multitools.core.openai_client.OpenAI'):
+        with patch('src.ia_multitools.core.openai_client.OpenAI'):
             client = OpenAIClient()
             sig = inspect.signature(client.simple_completion)
             params = list(sig.parameters.keys())
@@ -187,7 +183,7 @@ class TestSimpleCompletionSignature:
         """Vérifie que max_tokens est optionnel (a une valeur par défaut)"""
         import inspect
 
-        with patch('ia_multitools.core.openai_client.OpenAI'):
+        with patch('src.ia_multitools.core.openai_client.OpenAI'):
             client = OpenAIClient()
             sig = inspect.signature(client.simple_completion)
             max_tokens_param = sig.parameters['max_tokens']
@@ -200,7 +196,7 @@ class TestSimpleCompletionSignature:
         """Vérifie l'ordre des paramètres"""
         import inspect
 
-        with patch('ia_multitools.core.openai_client.OpenAI'):
+        with patch('src.ia_multitools.core.openai_client.OpenAI'):
             client = OpenAIClient()
             sig = inspect.signature(client.simple_completion)
             params = list(sig.parameters.keys())
@@ -213,4 +209,3 @@ class TestSimpleCompletionSignature:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
-

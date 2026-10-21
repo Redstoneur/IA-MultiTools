@@ -154,7 +154,6 @@ def main() -> int:
         try:
             # Essayer imports relatifs (python -m)
             from .core.config_manager import get_config_manager
-            from .core.encryption import init_encryption
             from .core.authentication import get_auth_manager
             from .core.openai_client import init_openai_client
             from .ui.main_window import MainWindow
@@ -168,7 +167,6 @@ def main() -> int:
                 sys.path.insert(0, str(src_path))
 
             from ia_multitools.core.config_manager import get_config_manager
-            from ia_multitools.core.encryption import init_encryption
             from ia_multitools.core.authentication import get_auth_manager
             from ia_multitools.core.openai_client import init_openai_client
             from ia_multitools.ui.main_window import MainWindow
@@ -178,10 +176,6 @@ def main() -> int:
         # Initialiser la configuration
         config_manager = get_config_manager(debug_mode=args.debug)
         config = config_manager.get_config()
-
-        # Initialiser le chiffrement
-        logger.info("Initialisation du chiffrement...")
-        init_encryption()
 
         # Initialiser l'authentification
         logger.info("Initialisation de l'authentification...")
@@ -262,4 +256,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

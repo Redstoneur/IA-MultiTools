@@ -192,5 +192,3 @@ class CorrectionTab:
         self.input_text.delete("1.0", tk.END)
         self.instructions_entry.delete(0, tk.END)
         self.result_text.delete("1.0", tk.END)
-        self.format_var.set("text")
-        self.format_var.set("text")

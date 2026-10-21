@@ -169,9 +169,8 @@ Toutes les Pull Requests seront revues. Attendez-vous à:
 
 ## Licence
 
-En contribuant, vous acceptez que vos contributions soient sous licence MIT.
+En contribuant, vous acceptez que vos contributions soient sous licence GNU General Public License v3.0 (GPL-3.0-only).
 
 ## Questions ?
 
 N'hésitez pas à ouvrir une Issue pour toute question !
-

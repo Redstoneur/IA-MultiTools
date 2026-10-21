@@ -7,9 +7,8 @@ Ce module fournit un client pour interagir avec OpenAI et tout service compatibl
 
 import logging
 from typing import Optional, Dict, Any, List
-import openai
 from openai import OpenAI, OpenAIError
-import ssl
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class OpenAIClient:
         temperature: float = 0.2,
         max_tokens: Optional[int] = None,
         timeout: int = 60,
-        verify_ssl: bool = False
+        verify_ssl: bool = True
     ) -> None:
         """
         Initialise le client OpenAI.
@@ -52,20 +51,27 @@ class OpenAIClient:
         self.timeout = timeout
         self.verify_ssl = verify_ssl
 
-        # Configuration SSL
-        if not verify_ssl:
-            ssl._create_default_https_context = ssl._create_unverified_context
-
         # Initialiser le client OpenAI
         try:
-            self.client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url,
-                timeout=self.timeout
-            )
-            logger.info(f"Client OpenAI initialisé - URL: {base_url}, Modèle: {model}")
+            self.client = self._build_client(self.api_key, self.base_url, self.timeout, self.verify_ssl)
+            logger.info("Client OpenAI initialisé - Modèle: %s", model)
         except Exception as e:
-            logger.error(f"Erreur lors de l'initialisation du client OpenAI: {e}")
+            logger.error("Erreur lors de l'initialisation du client OpenAI: %s", type(e).__name__)
+            raise
+
+    @staticmethod
+    def _build_client(api_key: str, base_url: str, timeout: int, verify_ssl: bool) -> OpenAI:
+        """Construit un client HTTP avec vérification TLS configurable localement."""
+        http_client = httpx.Client(verify=verify_ssl, timeout=timeout)
+        try:
+            return OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=timeout,
+                http_client=http_client,
+            )
+        except Exception:
+            http_client.close()
             raise
 
     def update_config(
@@ -90,32 +96,38 @@ class OpenAIClient:
             timeout: Nouveau timeout
             verify_ssl: Nouveau paramètre SSL
         """
-        if api_key is not None:
-            self.api_key = api_key
-        if base_url is not None:
-            self.base_url = base_url
-        if model is not None:
-            self.model = model
-        if temperature is not None:
-            self.temperature = temperature
-        if max_tokens is not None:
-            self.max_tokens = max_tokens
-        if timeout is not None:
-            self.timeout = timeout
-        if verify_ssl is not None:
-            self.verify_ssl = verify_ssl
+        next_api_key = api_key if api_key is not None else self.api_key
+        next_base_url = base_url if base_url is not None else self.base_url
+        next_model = model if model is not None else self.model
+        next_temperature = temperature if temperature is not None else self.temperature
+        next_max_tokens = max_tokens if max_tokens is not None else self.max_tokens
+        next_timeout = timeout if timeout is not None else self.timeout
+        next_verify_ssl = verify_ssl if verify_ssl is not None else self.verify_ssl
 
-        # Réinitialiser le client
         try:
-            self.client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url,
-                timeout=self.timeout
+            next_client = self._build_client(
+                next_api_key,
+                next_base_url,
+                next_timeout,
+                next_verify_ssl,
             )
+            self.client.close()
+            self.client = next_client
+            self.api_key = next_api_key
+            self.base_url = next_base_url
+            self.model = next_model
+            self.temperature = next_temperature
+            self.max_tokens = next_max_tokens
+            self.timeout = next_timeout
+            self.verify_ssl = next_verify_ssl
             logger.info("Configuration du client OpenAI mise à jour")
         except Exception as e:
             logger.error(f"Erreur lors de la mise à jour de la configuration: {e}")
             raise
+
+    def close(self) -> None:
+        """Ferme les ressources HTTP associées à ce client."""
+        self.client.close()
 
     def chat_completion(
         self,
@@ -166,10 +178,10 @@ class OpenAIClient:
             return content
 
         except OpenAIError as e:
-            logger.error(f"Erreur OpenAI: {e}")
+            logger.error("Erreur OpenAI: %s", type(e).__name__)
             return None
         except Exception as e:
-            logger.error(f"Erreur lors de la complétion: {e}")
+            logger.error("Erreur lors de la complétion: %s", type(e).__name__)
             return None
 
     def simple_completion(
@@ -221,8 +233,8 @@ class OpenAIClient:
                 return False, "Aucune réponse de l'API"
 
         except Exception as e:
-            error_msg = f"Erreur de connexion: {str(e)}"
-            logger.error(error_msg)
+            error_msg = f"Erreur de connexion ({type(e).__name__})"
+            logger.error("Erreur de connexion à l'API: %s", type(e).__name__)
             return False, error_msg
 
     def list_models(self) -> List[str]:
@@ -238,7 +250,7 @@ class OpenAIClient:
             logger.info(f"Modèles disponibles: {len(model_names)}")
             return model_names
         except Exception as e:
-            logger.error(f"Erreur lors du listage des modèles: {e}")
+            logger.error("Erreur lors du listage des modèles: %s", type(e).__name__)
             return []
 
     def get_model_info(self) -> Dict[str, Any]:
@@ -268,7 +280,7 @@ def get_openai_client(
     model: str = "meta-llama-3.1-8b-instruct",
     temperature: float = 0.2,
     timeout: int = 60,
-    verify_ssl: bool = False
+    verify_ssl: bool = True
 ) -> OpenAIClient:
     """
     Récupère l'instance globale du client OpenAI.
@@ -304,7 +316,7 @@ def init_openai_client(
     temperature: float = 0.2,
     max_tokens: Optional[int] = None,
     timeout: int = 60,
-    verify_ssl: bool = False
+    verify_ssl: bool = True
 ) -> OpenAIClient:
     """
     Initialise le client OpenAI global.
@@ -322,7 +334,7 @@ def init_openai_client(
         Instance du client OpenAI
     """
     global _openai_client
-    _openai_client = OpenAIClient(
+    next_client = OpenAIClient(
         api_key=api_key,
         base_url=base_url,
         model=model,
@@ -331,5 +343,7 @@ def init_openai_client(
         timeout=timeout,
         verify_ssl=verify_ssl
     )
+    if _openai_client is not None:
+        _openai_client.close()
+    _openai_client = next_client
     return _openai_client
-

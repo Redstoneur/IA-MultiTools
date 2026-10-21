@@ -10,9 +10,12 @@ from tkinter import messagebox
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from typing import Optional
+from pathlib import Path
+import sys
 
 from ..core.config_manager import ConfigManager
 from ..core.authentication import AuthenticationManager
+from ..constants import APP_FULL_NAME, APP_LICENSE
 from .tabs.definition_tab import DefinitionTab
 from .tabs.synonym_tab import SynonymTab
 from .tabs.correction_tab import CorrectionTab
@@ -58,8 +61,8 @@ class MainWindow:
         self.root.geometry("1000x700")
         self.root.minsize(800, 600)
 
-        # Icône (si disponible)
-        # self.root.iconbitmap("path/to/icon.ico")
+        self.logo_image: Optional[tk.PhotoImage] = None
+        self._setup_branding()
 
         # Variables
         self.settings_window: Optional[SettingsWindow] = None
@@ -81,6 +84,38 @@ class MainWindow:
         if self.config.first_run:
             logger.info("Premier lancement détecté, affichage de l'assistant")
             self.root.after(500, self._show_first_run_wizard)
+
+    def _resolve_asset_path(self, filename: str) -> Optional[Path]:
+        """Résout le chemin d'un asset en mode dev et en mode PyInstaller."""
+        candidate_dirs = []
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            candidate_dirs.append(Path(sys._MEIPASS) / "assets")
+
+        candidate_dirs.extend([
+            Path(__file__).resolve().parents[3] / "assets",
+            Path.cwd() / "assets",
+        ])
+
+        for directory in candidate_dirs:
+            candidate = directory / filename
+            if candidate.exists():
+                return candidate
+        return None
+
+    def _setup_branding(self) -> None:
+        """Charge et applique le logo/icône de l'application si disponible."""
+        logo_path = self._resolve_asset_path("logo.png")
+        if not logo_path:
+            logger.warning("Logo non trouvé dans assets/logo.png")
+            return
+        try:
+            self.logo_image = tk.PhotoImage(file=str(logo_path)).subsample(4, 4)
+            logo_image = self.logo_image
+            if logo_image is not None:
+                self.root.iconphoto(True, logo_image)
+            logger.info(f"Logo chargé: {logo_path}")
+        except Exception as exc:
+            logger.warning(f"Impossible de charger le logo: {exc}")
 
     def _build_menu(self) -> None:
         """Construit la barre de menu."""
@@ -115,6 +150,9 @@ class MainWindow:
         # En-tête
         header_frame = ttk.Frame(main_frame)
         header_frame.pack(fill=X, padx=5, pady=(0, 10))
+
+        if self.logo_image:
+            ttk.Label(header_frame, image=self.logo_image).pack(side=LEFT, padx=(0, 8))
 
         title_label = ttk.Label(
             header_frame,
@@ -211,7 +249,7 @@ Utilisation par outil:
 
     def _show_about(self) -> None:
         """Affiche la boîte de dialogue À propos."""
-        about_text = """IA-MultiTools v1.0.0
+        about_text = f"""{APP_FULL_NAME}
 
 Application desktop Python multiplateforme proposant
 plusieurs outils linguistiques assistés par IA.
@@ -222,7 +260,7 @@ Outils disponibles:
   • Correction de texte
   • Correction d'e-mails professionnels
 
-Licence: MIT
+Licence: {APP_LICENSE}
 © 2026 IA-MultiTools Team
 """
         messagebox.showinfo("À propos", about_text)
@@ -263,4 +301,3 @@ Licence: MIT
         """Lance la boucle principale de l'application."""
         logger.info("Démarrage de la boucle principale")
         self.root.mainloop()
-

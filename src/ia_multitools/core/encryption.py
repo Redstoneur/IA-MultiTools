@@ -5,9 +5,7 @@ Ce module fournit les fonctionnalités de chiffrement/déchiffrement pour sécur
 toutes les données sensibles de l'application.
 """
 
-import os
-import base64
-import hashlib
+import getpass
 from typing import Optional
 from cryptography.fernet import Fernet, InvalidToken
 import logging
@@ -19,7 +17,7 @@ class EncryptionManager:
     """
     Gestionnaire de chiffrement utilisant Fernet.
 
-    Génère des clés de chiffrement liées au compte utilisateur et fournit des méthodes
+    Génère des clés aléatoires et fournit des méthodes
     pour chiffrer/déchiffrer des données de manière sécurisée.
     """
 
@@ -28,59 +26,20 @@ class EncryptionManager:
         Initialise le gestionnaire de chiffrement.
 
         Args:
-            user_identifier: Identifiant unique de l'utilisateur (utilisé pour dériver la clé).
-                           Si None, utilise le nom d'utilisateur système.
+            user_identifier: Conservé pour compatibilité; n'est pas utilisé pour dériver la clé.
         """
-        self.user_identifier = user_identifier or self._get_system_user()
+        self.user_identifier = user_identifier or getpass.getuser()
         self._fernet: Optional[Fernet] = None
         self._key: Optional[bytes] = None
 
-    def _get_system_user(self) -> str:
+    def generate_key(self) -> bytes:
         """
-        Récupère l'identifiant de l'utilisateur système.
-
-        Returns:
-            Nom d'utilisateur système
-        """
-        import getpass
-        return getpass.getuser()
-
-    def _derive_key(self, password: str, salt: bytes) -> bytes:
-        """
-        Dérive une clé de chiffrement depuis un mot de passe.
-
-        Args:
-            password: Mot de passe source
-            salt: Salt pour la dérivation
-
-        Returns:
-            Clé de chiffrement de 32 bytes
-        """
-        kdf = hashlib.pbkdf2_hmac(
-            'sha256',
-            password.encode('utf-8'),
-            salt,
-            100000,  # 100k iterations
-            dklen=32
-        )
-        return base64.urlsafe_b64encode(kdf)
-
-    def generate_key(self, salt: Optional[bytes] = None) -> bytes:
-        """
-        Génère une clé de chiffrement liée au compte utilisateur.
-
-        Args:
-            salt: Salt optionnel pour la dérivation. Si None, un salt par défaut est utilisé.
+        Génère une clé aléatoire pour Fernet.
 
         Returns:
             Clé Fernet encodée en base64
         """
-        if salt is None:
-            # Salt par défaut basé sur l'identifiant utilisateur
-            salt = hashlib.sha256(self.user_identifier.encode('utf-8')).digest()
-
-        # Dériver une clé depuis l'identifiant utilisateur
-        self._key = self._derive_key(self.user_identifier, salt)
+        self._key = Fernet.generate_key()
         self._fernet = Fernet(self._key)
 
         logger.debug("Clé de chiffrement générée avec succès")
@@ -215,26 +174,6 @@ class EncryptionManager:
             logger.error(f"Erreur lors du déchiffrement du fichier: {e}")
             raise
 
-    def rotate_key(self, old_key: bytes, new_password: str, salt: Optional[bytes] = None) -> bytes:
-        """
-        Rotate les clés de chiffrement (ré-chiffrement avec une nouvelle clé).
-
-        Args:
-            old_key: Ancienne clé de chiffrement
-            new_password: Nouveau mot de passe pour dériver la nouvelle clé
-            salt: Salt optionnel pour la nouvelle clé
-
-        Returns:
-            Nouvelle clé de chiffrement
-        """
-        if salt is None:
-            salt = os.urandom(32)
-
-        new_key = self._derive_key(new_password, salt)
-        logger.info("Rotation de clé effectuée avec succès")
-        return new_key
-
-
 # Instance globale pour faciliter l'utilisation
 _encryption_manager: Optional[EncryptionManager] = None
 
@@ -264,7 +203,7 @@ def init_encryption(user_identifier: Optional[str] = None) -> EncryptionManager:
         Instance du gestionnaire de chiffrement
     """
     global _encryption_manager
-    _encryption_manager = EncryptionManager(user_identifier)
-    _encryption_manager.generate_key()
+    if _encryption_manager is None:
+        _encryption_manager = EncryptionManager(user_identifier)
+        _encryption_manager.generate_key()
     return _encryption_manager
-

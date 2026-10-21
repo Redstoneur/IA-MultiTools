@@ -6,7 +6,7 @@ import logging
 import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-from tk inter import messagebox
+from tkinter import messagebox
 from typing import Any, Optional, Callable
 
 from ..core.authentication import AuthenticationManager
@@ -108,7 +108,7 @@ class PasswordDialog:
 
         # Champ de mot de passe
         password_frame = ttk.Frame(main_frame)
-        password_frame.pack(fillREQUIRED, pady=10)
+        password_frame.pack(fill=X, pady=10)
 
         ttk.Label(
             password_frame,

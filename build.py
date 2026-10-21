@@ -10,6 +10,10 @@ import platform
 import subprocess
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
 def build_executable():
     """Construit l'exécutable avec PyInstaller."""
 
@@ -32,6 +36,7 @@ def build_executable():
     # Paramètres communs
     main_script = "src/ia_multitools/main.py"
     app_name = "IA-MultiTools"
+    separator = ";" if system == "Windows" else ":"
 
     # Commande PyInstaller
     cmd = [
@@ -40,6 +45,7 @@ def build_executable():
         "--windowed",
         "--name", app_name,
         "--clean",
+        "--add-data", f"assets{separator}assets",
 
         # Imports cachés
         "--hidden-import", "ttkbootstrap",
@@ -59,7 +65,7 @@ def build_executable():
     ]
 
     # Icône (si disponible)
-    icon_path = Path("assets/icon.ico" if system == "Windows" else "assets/icon.png")
+    icon_path = Path("assets/logo.ico" if system == "Windows" else "assets/logo.png")
     if icon_path.exists():
         cmd.extend(["--icon", str(icon_path)])
         print(f"✓ Icône trouvée: {icon_path}")
@@ -161,4 +167,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

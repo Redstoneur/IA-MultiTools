@@ -110,7 +110,6 @@ class DefinitionService:
                     ai_response=response,
                     metadata={
                         "word_limit": word_limit,
-                        "output_format": output_format,
                         "temperature": temperature or self.client.temperature
                     }
                 )

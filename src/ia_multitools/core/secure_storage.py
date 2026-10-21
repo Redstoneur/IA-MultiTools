@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 import logging
 
+from cryptography.fernet import Fernet
 from .encryption import EncryptionManager, get_encryption_manager
 from .keyring_manager import KeyringManager, get_keyring_manager
 
@@ -21,8 +22,8 @@ class SecureStorage:
     """
     Gestionnaire de stockage sécurisé pour les données sensibles.
 
-    Utilise le chiffrement Fernet pour les fichiers et optionnellement le trousseau
-    système pour les clés de chiffrement.
+    Utilise Fernet pour les fichiers et conserve la clé de chiffrement dans le
+    trousseau système.
     """
 
     def __init__(
@@ -39,7 +40,7 @@ class SecureStorage:
             storage_dir: Répertoire de stockage
             encryption_manager: Gestionnaire de chiffrement (optionnel)
             keyring_manager: Gestionnaire de trousseau (optionnel)
-            use_keyring: Utiliser le trousseau système si disponible
+            use_keyring: Exiger le trousseau système pour protéger la clé de chiffrement
         """
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -47,6 +48,29 @@ class SecureStorage:
         self.encryption_manager = encryption_manager or get_encryption_manager()
         self.keyring_manager = keyring_manager or get_keyring_manager()
         self.use_keyring = use_keyring and self.keyring_manager.is_available()
+
+        if use_keyring and not self.use_keyring:
+            raise RuntimeError(
+                "Un trousseau système fonctionnel est requis pour chiffrer les données persistées."
+            )
+
+        if self.use_keyring:
+            encoded_key = self.keyring_manager.get_encryption_key()
+            if encoded_key is None:
+                if any(self.storage_dir.glob("*.enc")):
+                    raise RuntimeError(
+                        "La clé de chiffrement est absente alors que des données chiffrées existent."
+                    )
+                key = Fernet.generate_key()
+                if not self.keyring_manager.set_encryption_key(key.decode("ascii")):
+                    raise RuntimeError(
+                        "Impossible d'enregistrer la clé de chiffrement dans le trousseau système."
+                    )
+            else:
+                key = encoded_key.encode("ascii")
+            self.encryption_manager.set_key(key)
+        else:
+            self.encryption_manager.generate_key()
 
         logger.info(f"Stockage sécurisé initialisé: {self.storage_dir}")
         logger.debug(f"Utilisation du trousseau système: {self.use_keyring}")
@@ -75,6 +99,13 @@ class SecureStorage:
             True si la sauvegarde a réussi
         """
         try:
+            if self.use_keyring:
+                encoded_key = self.keyring_manager.get_encryption_key()
+                if encoded_key is None:
+                    logger.error("Clé de chiffrement absente du trousseau système")
+                    return False
+                self.encryption_manager.set_key(encoded_key.encode("ascii"))
+
             # Sérialiser en JSON
             json_data = json.dumps(data, indent=2, ensure_ascii=False)
 
@@ -268,4 +299,3 @@ def init_secure_storage(
     global _secure_storage
     _secure_storage = SecureStorage(storage_dir, use_keyring=use_keyring)
     return _secure_storage
-

@@ -7,13 +7,13 @@ de sécurité, d'apparence et les prompts système.
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 import logging
 from dataclasses import dataclass, field, asdict
 import sys
 import platformdirs
 
-from .secure_storage import SecureStorage, get_secure_storage
+from .keyring_manager import KeyringManager, get_keyring_manager
 from ..constants import VERSION, ALLOW_AUTO_VERSION_BUMP
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class AIConfig:
     model: str = "meta-llama-3.1-8b-instruct"
     temperature: float = 0.2
     timeout: int = 60
-    verify_ssl: bool = False
+    verify_ssl: bool = True
     max_tokens: Optional[int] = None
 
 
@@ -120,6 +120,8 @@ class ConfigManager:
     """
 
     CONFIG_FILENAME = "config"
+    API_KEY_KEYRING_ID = "openai_api_key"
+    APP_LOCK_PASSWORD_KEYRING_ID = "app_lock_password"
 
     def __init__(self, debug_mode: bool = False) -> None:
         """
@@ -135,6 +137,7 @@ class ConfigManager:
         # Initialiser le stockage sécurisé
         from .secure_storage import init_secure_storage
         self.storage = init_secure_storage(self.config_dir)
+        self.keyring_manager: KeyringManager = get_keyring_manager()
 
         self.config = AppConfig()
         self._load_env_variables()
@@ -209,12 +212,21 @@ class ConfigManager:
                 return False
 
             # Reconstruire la configuration
-            self.config.ai = AIConfig(**data.get("ai", {}))
+            ai_data = data.get("ai", {})
+            # La clé API n'est jamais restaurée depuis le fichier config.
+            ai_data.pop("api_key", None)
+            self.config.ai = AIConfig(**ai_data)
             self.config.security = SecurityConfig(**data.get("security", {}))
             self.config.appearance = AppearanceConfig(**data.get("appearance", {}))
             self.config.history = HistoryConfig(**data.get("history", {}))
             self.config.logging = LoggingConfig(**data.get("logging", {}))
             self.config.prompts = SystemPrompts(**data.get("prompts", {}))
+
+            # Restaurer la clé API depuis le trousseau si activé.
+            if self.config.security.use_keyring and self.keyring_manager.is_available():
+                self.config.ai.api_key = self.keyring_manager.get_api_key() or ""
+            else:
+                self.config.ai.api_key = ""
 
             # Charger la version avec protection
             loaded_version = data.get("version", VERSION)
@@ -229,11 +241,14 @@ class ConfigManager:
 
             self.config.first_run = data.get("first_run", False)
 
+            # Les variables d'environnement gardent la priorité sur les valeurs persistées.
+            self._load_env_variables()
+
             logger.info("Configuration chargée avec succès")
             return True
 
         except Exception as e:
-            logger.error(f"Erreur lors du chargement de la configuration: {e}")
+            logger.error("Erreur lors du chargement de la configuration: %s", type(e).__name__)
             return False
 
     def save(self) -> bool:
@@ -244,8 +259,30 @@ class ConfigManager:
             True si la sauvegarde a réussi
         """
         try:
+            if not self.keyring_manager.is_available():
+                logger.error("Le trousseau système est indisponible; configuration non sauvegardée")
+                return False
+            if not self.config.security.use_keyring:
+                logger.error("Le trousseau système est obligatoire pour sauvegarder la configuration")
+                return False
+
+            api_key = self.config.ai.api_key
+            if api_key:
+                if not self.keyring_manager.is_available():
+                    logger.error("Le trousseau système est requis pour stocker la clé API, mais il est indisponible")
+                    return False
+                if not self.keyring_manager.set_api_key(api_key):
+                    logger.error("Impossible de stocker la clé API dans le trousseau système")
+                    return False
+            elif self.keyring_manager.is_available() and not self.keyring_manager.delete_api_key():
+                logger.error("Impossible de supprimer la clé API du trousseau système")
+                return False
+
+            ai_data = asdict(self.config.ai)
+            ai_data.pop("api_key", None)
+
             data = {
-                "ai": asdict(self.config.ai),
+                "ai": ai_data,
                 "security": asdict(self.config.security),
                 "appearance": asdict(self.config.appearance),
                 "history": asdict(self.config.history),
@@ -265,7 +302,7 @@ class ConfigManager:
             return success
 
         except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde de la configuration: {e}")
+            logger.error("Erreur lors de la sauvegarde de la configuration: %s", type(e).__name__)
             return False
 
     def reset_to_defaults(self) -> None:
@@ -292,7 +329,41 @@ class ConfigManager:
         for key, value in kwargs.items():
             if hasattr(self.config.ai, key):
                 setattr(self.config.ai, key, value)
-                logger.debug(f"Configuration IA mise à jour: {key}={value}")
+                sensitive = any(
+                    marker in key.lower()
+                    for marker in ("api_key", "password", "secret", "token", "credential")
+                )
+                safe_value = "[REDACTED]" if sensitive else value
+                logger.debug(f"Configuration IA mise à jour: {key}={safe_value}")
+
+    # Alias de compatibilité utilisés par l'UI.
+    def load_config(self) -> bool:
+        """Alias de `load` pour compatibilité API interne."""
+        return self.load()
+
+    def save_config(self) -> bool:
+        """Alias de `save` pour compatibilité API interne."""
+        return self.save()
+
+    def set_password(self, password: str) -> bool:
+        """Délègue la gestion du mot de passe au gestionnaire d'authentification."""
+        from .authentication import get_auth_manager
+        return get_auth_manager().set_password(password)
+
+    def verify_password(self, password: str) -> bool:
+        """Délègue la vérification du mot de passe au gestionnaire d'authentification."""
+        from .authentication import get_auth_manager
+        return get_auth_manager().verify_password(password)
+
+    def has_password(self) -> bool:
+        """Indique si un mot de passe d'application est défini."""
+        from .authentication import get_auth_manager
+        return get_auth_manager().has_password()
+
+    def remove_password(self) -> bool:
+        """Supprime le mot de passe d'application."""
+        from .authentication import get_auth_manager
+        return get_auth_manager().remove_password()
 
     def update_security_config(self, **kwargs: Any) -> None:
         """
@@ -304,7 +375,12 @@ class ConfigManager:
         for key, value in kwargs.items():
             if hasattr(self.config.security, key):
                 setattr(self.config.security, key, value)
-                logger.debug(f"Configuration sécurité mise à jour: {key}={value}")
+                safe_value = (
+                    "[REDACTED]"
+                    if any(marker in key.lower() for marker in ("password", "secret", "token", "credential"))
+                    else value
+                )
+                logger.debug(f"Configuration sécurité mise à jour: {key}={safe_value}")
 
     def validate(self) -> tuple[bool, list[str]]:
         """
@@ -326,6 +402,10 @@ class ConfigManager:
             errors.append("Timeout doit être positif")
 
         # Validation sécurité
+        if not self.config.security.encryption_enabled:
+            errors.append("Le chiffrement des données ne peut pas être désactivé")
+        if not self.config.security.use_keyring:
+            errors.append("Le trousseau système est obligatoire pour le stockage sécurisé")
         if self.config.security.auto_lock_minutes < 0:
             errors.append("Délai de verrouillage automatique doit être >= 0")
 
@@ -356,4 +436,3 @@ def get_config_manager(debug_mode: bool = False) -> ConfigManager:
         _config_manager = ConfigManager(debug_mode)
         _config_manager.load()
     return _config_manager
-

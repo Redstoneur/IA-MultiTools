@@ -1,8 +1,10 @@
 # IA-MultiTools
 
+![Logo IA-MultiTools](assets/logo.svg)
+
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.12+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
+![License](https://img.shields.io/badge/license-GPL--3.0--only-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)
 
 Application desktop Python multiplateforme proposant plusieurs outils linguistiques assistés par IA locale ou distante via une API compatible OpenAI.
@@ -19,8 +21,8 @@ Application desktop Python multiplateforme proposant plusieurs outils linguistiq
 ### Caractéristiques techniques
 
 - 🎨 **Interface moderne** avec mode sombre (ttkbootstrap)
-- 🔐 **Sécurité intégrée** : chiffrement Fernet de toutes les données
-- 🔑 **Support trousseau système** : Keyring (Windows/Linux)
+- 🔐 **Sécurité intégrée** : clés Fernet aléatoires conservées dans le trousseau système
+- 🔑 **Clé API** stockée uniquement dans le trousseau système, jamais dans le fichier de configuration
 - 📚 **Historique chiffré** de vos requêtes et réponses
 - 🌐 **Compatible API OpenAI** : OpenAI, LM Studio, LocalAI, llama.cpp, etc.
 - 🚀 **Traitement asynchrone** : interface non bloquante
@@ -128,7 +130,7 @@ Au premier lancement :
 
 ### Chiffrement des données
 
-Toutes les données utilisateur sont **chiffrées au repos** avec Fernet (cryptography) :
+Les données utilisateur persistées sont **chiffrées au repos** avec Fernet. La clé Fernet aléatoire est conservée dans le trousseau système :
 - Configuration (config.enc)
 - Historique (history.enc)
 - Prompts personnalisés (prompts.enc)
@@ -136,9 +138,13 @@ Toutes les données utilisateur sont **chiffrées au repos** avec Fernet (crypto
 
 ### Trousseau système
 
-L'application utilise le trousseau système lorsque disponible :
+Le trousseau système est requis pour accéder aux données chiffrées et enregistrer une clé API. Il n'existe pas de repli vers un fichier local :
 - **Windows** : DPAPI / Credential Manager
 - **Linux** : Secret Service / GNOME Keyring / KWallet
+
+Sous Linux, une session D-Bus avec Secret Service (par exemple GNOME Keyring ou KWallet) doit être disponible. L'application refuse de sauvegarder des données si le trousseau ne peut pas être utilisé.
+
+Une clé API fournie par `OPENAI_API_KEY` est utilisée en mémoire pour la session. Pour la conserver entre les démarrages, enregistrez-la depuis les paramètres afin qu'elle soit placée dans le trousseau système.
 
 ### Verrouillage automatique
 
@@ -165,8 +171,10 @@ OPENAI_MODEL=meta-llama-3.1-8b-instruct
 OPENAI_BASE_URL=http://127.0.0.1:1234/v1
 OPENAI_TEMPERATURE=0.2
 OPENAI_TIMEOUT=60
-OPENAI_VERIFY_SSL=false
+OPENAI_VERIFY_SSL=true
 ```
+
+La validation des certificats TLS est activée par défaut. Ne désactivez `OPENAI_VERIFY_SSL` que pour un serveur de confiance utilisant un certificat non standard.
 
 ### Prompts système personnalisables
 
@@ -224,7 +232,7 @@ src/ia_multitools/
 
 **Windows :**
 ```bash
-pyinstaller --onefile --windowed --name IA-MultiTools --icon=assets/icon.ico src/ia_multitools/main.py
+pyinstaller --onefile --windowed --name IA-MultiTools --icon=assets/logo.ico src/ia_multitools/main.py
 ```
 
 **Linux :**
@@ -262,7 +270,7 @@ Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](CONTRIBUTING
 
 ## 📄 Licence
 
-Ce projet est sous licence MIT. Voir [LICENSE](LICENSE) pour plus de détails.
+Ce projet est sous licence GNU General Public License v3.0 (GPL-3.0-only). Voir [LICENSE](LICENSE) pour plus de détails.
 
 ## 🙏 Remerciements
 
@@ -270,6 +278,3 @@ Ce projet est sous licence MIT. Voir [LICENSE](LICENSE) pour plus de détails.
 - [OpenAI](https://openai.com/) pour l'API
 - [cryptography](https://cryptography.io/) pour le chiffrement
 - Communauté Open Source
-
-
-

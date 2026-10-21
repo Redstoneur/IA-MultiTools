@@ -5,10 +5,15 @@ Gère l'authentification système optionnelle et le verrouillage automatique.
 """
 
 import logging
-import time
 from typing import Optional, Callable
 from datetime import datetime, timedelta
 import threading
+import base64
+import hashlib
+import hmac
+import secrets
+
+from .keyring_manager import get_keyring_manager
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +42,70 @@ class AuthenticationManager:
         self._lock_callback: Optional[Callable[[], None]] = None
         self._auto_lock_thread: Optional[threading.Thread] = None
         self._stop_auto_lock = threading.Event()
+        self._keyring = get_keyring_manager()
 
         if self.auto_lock_minutes > 0:
             self._start_auto_lock_monitor()
 
         logger.info(f"Authentification initialisée - Verrouillage: {lock_enabled}, "
                    f"Auto-lock: {auto_lock_minutes}min")
+
+    @staticmethod
+    def _hash_password(password: str, salt: bytes) -> bytes:
+        """Dérive un hash de mot de passe avec PBKDF2-HMAC-SHA256."""
+        return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
+
+    def set_password(self, password: str) -> bool:
+        """Stocke un hash de mot de passe dans le trousseau système."""
+        if not password:
+            return False
+        if not self._keyring.is_available():
+            logger.error("Impossible de définir un mot de passe: trousseau système indisponible")
+            return False
+
+        salt = secrets.token_bytes(16)
+        pwd_hash = self._hash_password(password, salt)
+        payload = "$".join([
+            "pbkdf2_sha256",
+            "200000",
+            base64.b64encode(salt).decode("ascii"),
+            base64.b64encode(pwd_hash).decode("ascii"),
+        ])
+        saved = self._keyring.set_password("app_lock_password", payload)
+        if saved:
+            logger.info("Mot de passe d'application défini")
+        return saved
+
+    def has_password(self) -> bool:
+        """Retourne True si un mot de passe d'application existe."""
+        return bool(self._keyring.get_password("app_lock_password"))
+
+    def verify_password(self, password: str) -> bool:
+        """Vérifie le mot de passe d'application."""
+        stored = self._keyring.get_password("app_lock_password")
+        if not stored:
+            return False
+        try:
+            algo, iterations_str, salt_b64, hash_b64 = stored.split("$", 3)
+            if algo != "pbkdf2_sha256":
+                logger.error("Format de mot de passe non supporté")
+                return False
+
+            iterations = int(iterations_str)
+            salt = base64.b64decode(salt_b64.encode("ascii"))
+            expected_hash = base64.b64decode(hash_b64.encode("ascii"))
+            candidate_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+            return hmac.compare_digest(candidate_hash, expected_hash)
+        except Exception as exc:
+            logger.error(f"Erreur lors de la vérification du mot de passe: {exc}")
+            return False
+
+    def remove_password(self) -> bool:
+        """Supprime le mot de passe d'application."""
+        deleted = self._keyring.delete_password("app_lock_password")
+        if deleted:
+            logger.info("Mot de passe d'application supprimé")
+        return deleted
 
     def set_lock_callback(self, callback: Callable[[], None]) -> None:
         """

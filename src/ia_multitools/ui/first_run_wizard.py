@@ -3,6 +3,7 @@ Assistant de configuration initiale au premier lancement.
 """
 
 import logging
+import copy
 import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -10,7 +11,7 @@ from tkinter import messagebox
 from typing import Any, Optional, Callable
 
 from ..core.config_manager import ConfigManager
-from ..core.openai_client import OpenAIClient, get_openai_client
+from ..core.openai_client import OpenAIClient
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class FirstRunWizard:
         """
         self.config_manager = config_manager
         self.on_complete = on_complete
+        self._last_successful_test_signature: Optional[tuple[str, str, str]] = None
 
         # Fenêtre modale
         self.window = ttk.Toplevel(parent)
@@ -99,7 +101,6 @@ class FirstRunWizard:
         # Clé API
         ttk.Label(config_frame, text="Clé API (optionnel pour serveurs locaux):", font=("Segoe UI", 10, "bold")).pack(anchor=W, pady=(0, 5))
         self.api_key_entry = ttk.Entry(config_frame, font=("Segoe UI", 10), show="*")
-        self.api_key_entry.insert(0, "sk-dummy")
         self.api_key_entry.pack(fill=X, pady=(0, 15))
 
         # Modèle
@@ -180,9 +181,9 @@ class FirstRunWizard:
 
         self.window.update()
 
+        test_client: Optional[OpenAIClient] = None
         try:
             # Test avec un nouveau client temporaire
-            from ..core.openai_client import OpenAIClient
             test_client = OpenAIClient(
                 api_key=api_key or "sk-dummy",
                 base_url=base_url,
@@ -198,6 +199,7 @@ class FirstRunWizard:
             )
 
             if response:
+                self._last_successful_test_signature = (base_url, model, api_key)
                 self.status_label.config(
                     text="✅ Connexion réussie ! Vous pouvez enregistrer.",
                     bootstyle=SUCCESS
@@ -211,16 +213,20 @@ class FirstRunWizard:
                 raise Exception("Aucune réponse de l'API")
 
         except Exception as e:
-            logger.error(f"Erreur lors du test de connexion: {e}")
+            logger.error("Erreur lors du test de connexion: %s", type(e).__name__)
+            error_message = f"Erreur de connexion ({type(e).__name__})"
             self.status_label.config(
-                text=f"❌ Erreur de connexion: {str(e)}",
+                text=f"❌ {error_message}",
                 bootstyle=DANGER
             )
             messagebox.showerror(
                 "Erreur de connexion",
-                f"Impossible de se connecter à l'API:\n\n{str(e)}\n\nVérifiez vos paramètres et que le serveur IA est démarré."
+                f"Impossible de préparer la connexion ({type(e).__name__}). "
+                "Vérifiez vos paramètres et que le serveur IA est démarré."
             )
         finally:
+            if test_client is not None:
+                test_client.close()
             self.test_btn.config(state="normal", text="🔍 Tester la connexion")
 
     def _save_and_continue(self) -> None:
@@ -233,16 +239,30 @@ class FirstRunWizard:
             messagebox.showerror("Erreur", "Veuillez remplir tous les champs obligatoires.")
             return
 
+        if self._last_successful_test_signature != (base_url, model, api_key):
+            self.save_btn.config(state="disabled")
+            messagebox.showerror(
+                "Test requis",
+                "Testez avec succès la connexion avec les paramètres actuels avant de les enregistrer.",
+            )
+            return
+
         try:
             # Mettre à jour la configuration
             config = self.config_manager.get_config()
+            previous_config = copy.deepcopy(config)
             config.ai.base_url = base_url
-            config.ai.api_key = api_key or "sk-dummy"
+            config.ai.api_key = api_key
             config.ai.model = model
             config.first_run = False  # Marquer comme configuré
 
             # Sauvegarder
-            self.config_manager.save_config()
+            if not self.config_manager.save_config():
+                self.config_manager.config = previous_config
+                raise RuntimeError(
+                    "La configuration n'a pas pu être sauvegardée. "
+                    "Vérifiez la disponibilité du trousseau système."
+                )
 
             # Réinitialiser le client OpenAI avec les nouveaux paramètres
             from ..core.openai_client import init_openai_client
@@ -265,10 +285,10 @@ class FirstRunWizard:
             self._close()
 
         except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde: {e}")
+            logger.error("Erreur lors de la sauvegarde: %s", type(e).__name__)
             messagebox.showerror(
                 "Erreur",
-                f"Impossible de sauvegarder la configuration:\n\n{str(e)}"
+                f"Impossible de sauvegarder la configuration ({type(e).__name__})."
             )
 
     def _skip(self) -> None:
@@ -284,7 +304,14 @@ class FirstRunWizard:
             # Marquer comme non premier lancement
             config = self.config_manager.get_config()
             config.first_run = False
-            self.config_manager.save_config()
+            if not self.config_manager.save_config():
+                messagebox.showerror(
+                    "Erreur",
+                    "Impossible de sauvegarder la configuration. Vérifiez le trousseau système.",
+                    parent=self.window,
+                )
+                config.first_run = True
+                return
 
             logger.info("Configuration initiale ignorée")
             self._close()
@@ -294,4 +321,3 @@ class FirstRunWizard:
         if self.on_complete:
             self.on_complete()
         self.window.destroy()
-

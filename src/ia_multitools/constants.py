@@ -16,7 +16,7 @@ VERSION_LOCKED = True  # Flag pour empêcher toute modification automatique
 APP_NAME = "IA-MultiTools"
 APP_FULL_NAME = f"{APP_NAME} v{VERSION}"
 APP_AUTHOR = "IA-MultiTools Team"
-APP_LICENSE = "MIT"
+APP_LICENSE = "GNU GPL v3.0 (GPL-3.0-only)"
 APP_YEAR = 2026
 
 # Configuration par défaut
@@ -73,4 +73,3 @@ def validate_version_lock() -> bool:
         True si la version est verrouillée
     """
     return VERSION_LOCKED and VERSION == "1.0.0"
-

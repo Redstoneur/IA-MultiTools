@@ -219,4 +219,3 @@ class EmailTab:
         self.result_text.delete("1.0", tk.END)
         self.make_professional_var.set(False)
         self.add_greeting_var.set(True)
-        self.format_var.set("text")

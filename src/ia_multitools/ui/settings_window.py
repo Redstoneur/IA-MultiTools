@@ -5,6 +5,7 @@ Permet de configurer l'IA, la sécurité, l'apparence, et les prompts système.
 """
 
 import logging
+import copy
 import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -12,8 +13,7 @@ from tkinter import messagebox
 from typing import Optional
 
 from ..core.config_manager import ConfigManager
-from ..core.openai_client import get_openai_client
-from ..core.authentication import get_auth_manager
+from ..core.openai_client import OpenAIClient, init_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class SettingsWindow:
         """
         self.config_manager = config_manager
         self.config = config_manager.get_config()
+        self._last_successful_test_signature: Optional[tuple[str, str, str, float, int, bool]] = None
 
         # Créer la fenêtre
         self.window = ttk.Toplevel(parent)
@@ -107,14 +108,19 @@ class SettingsWindow:
         ttk.Label(frame, text="Clé API:").grid(row=1, column=0, sticky=W, pady=5)
         self.api_key_var = tk.StringVar(value=self.config.ai.api_key)
         ttk.Entry(frame, textvariable=self.api_key_var, width=50, show="*").grid(row=1, column=1, pady=5, padx=10)
+        ttk.Label(
+            frame,
+            text="La clé API est stockée dans le trousseau système (pas dans le fichier de config).",
+            bootstyle=SECONDARY
+        ).grid(row=2, column=1, sticky=W, padx=10)
 
         # Modèle
-        ttk.Label(frame, text="Modèle:").grid(row=2, column=0, sticky=W, pady=5)
+        ttk.Label(frame, text="Modèle:").grid(row=3, column=0, sticky=W, pady=5)
         self.model_var = tk.StringVar(value=self.config.ai.model)
-        ttk.Entry(frame, textvariable=self.model_var, width=50).grid(row=2, column=1, pady=5, padx=10)
+        ttk.Entry(frame, textvariable=self.model_var, width=50).grid(row=3, column=1, pady=5, padx=10)
 
         # Température
-        ttk.Label(frame, text="Température (0.0 - 2.0):").grid(row=3, column=0, sticky=W, pady=5)
+        ttk.Label(frame, text="Température (0.0 - 2.0):").grid(row=4, column=0, sticky=W, pady=5)
         self.temperature_var = tk.DoubleVar(value=self.config.ai.temperature)
         ttk.Spinbox(
             frame,
@@ -123,10 +129,10 @@ class SettingsWindow:
             increment=0.1,
             textvariable=self.temperature_var,
             width=20
-        ).grid(row=3, column=1, pady=5, padx=10, sticky=W)
+        ).grid(row=4, column=1, pady=5, padx=10, sticky=W)
 
         # Timeout
-        ttk.Label(frame, text="Timeout (secondes):").grid(row=4, column=0, sticky=W, pady=5)
+        ttk.Label(frame, text="Timeout (secondes):").grid(row=5, column=0, sticky=W, pady=5)
         self.timeout_var = tk.IntVar(value=self.config.ai.timeout)
         ttk.Spinbox(
             frame,
@@ -135,7 +141,7 @@ class SettingsWindow:
             increment=10,
             textvariable=self.timeout_var,
             width=20
-        ).grid(row=4, column=1, pady=5, padx=10, sticky=W)
+        ).grid(row=5, column=1, pady=5, padx=10, sticky=W)
 
         # Vérifier SSL
         self.verify_ssl_var = tk.BooleanVar(value=self.config.ai.verify_ssl)
@@ -143,7 +149,7 @@ class SettingsWindow:
             frame,
             text="Vérifier les certificats SSL",
             variable=self.verify_ssl_var
-        ).grid(row=5, column=1, pady=10, sticky=W, padx=10)
+        ).grid(row=6, column=1, pady=10, sticky=W, padx=10)
 
         # Bouton de test
         ttk.Button(
@@ -151,27 +157,31 @@ class SettingsWindow:
             text="🔍 Tester la connexion",
             command=self._test_connection,
             bootstyle=INFO
-        ).grid(row=6, column=1, pady=10, sticky=W, padx=10)
+        ).grid(row=7, column=1, pady=10, sticky=W, padx=10)
+
+    def _get_current_ai_signature(self) -> tuple[str, str, str, float, int, bool]:
+        """Retourne une signature des paramètres IA à valider avant sauvegarde."""
+        return (
+            self.base_url_var.get().strip(),
+            self.model_var.get().strip(),
+            self.api_key_var.get().strip(),
+            self.temperature_var.get(),
+            self.timeout_var.get(),
+            self.verify_ssl_var.get(),
+        )
 
     def _build_security_tab(self, notebook: ttk.Notebook) -> None:
         """Construit l'onglet de sécurité."""
         frame = ttk.Frame(notebook, padding=15)
         notebook.add(frame, text="🔐 Sécurité")
 
-        # Chiffrement
-        self.encryption_var = tk.BooleanVar(value=self.config.security.encryption_enabled)
-        ttk.Checkbutton(
+        ttk.Label(
             frame,
-            text="Activer le chiffrement des données",
-            variable=self.encryption_var
-        ).pack(anchor=W, pady=10)
-
-        # Trousseau système
-        self.keyring_var = tk.BooleanVar(value=self.config.security.use_keyring)
-        ttk.Checkbutton(
-            frame,
-            text="Utiliser le trousseau système (recommandé)",
-            variable=self.keyring_var
+            text=(
+                "Les données sont toujours chiffrées. Le trousseau système est requis "
+                "pour protéger la clé de chiffrement et les clés API."
+            ),
+            wraplength=560,
         ).pack(anchor=W, pady=10)
 
         # Verrouillage de l'application
@@ -289,42 +299,70 @@ class SettingsWindow:
         canvas.pack(side=LEFT, fill=BOTH, expand=YES)
         scrollbar.pack(side=RIGHT, fill=Y)
 
-    def _test_connection(self) -> None:
-        """Teste la connexion à l'API."""
-        # Mettre à jour temporairement le client avec les nouvelles valeurs
+    def _test_connection(self) -> bool:
+        """Teste la connexion à l'API et retourne True en cas de succès."""
+        test_client: Optional[OpenAIClient] = None
         try:
-            client = get_openai_client()
-            client.update_config(
-                api_key=self.api_key_var.get(),
-                base_url=self.base_url_var.get(),
-                model=self.model_var.get(),
+            if not self.base_url_var.get().strip() or not self.model_var.get().strip():
+                messagebox.showerror("Erreur", "L'URL de base et le modèle sont obligatoires.")
+                return False
+
+            test_client = OpenAIClient(
+                api_key=self.api_key_var.get().strip(),
+                base_url=self.base_url_var.get().strip(),
+                model=self.model_var.get().strip(),
                 temperature=self.temperature_var.get(),
                 timeout=self.timeout_var.get(),
                 verify_ssl=self.verify_ssl_var.get()
             )
 
-            success, message = client.test_connection()
+            success, message = test_client.test_connection()
 
             if success:
+                self._last_successful_test_signature = self._get_current_ai_signature()
                 messagebox.showinfo("Test de connexion", "✓ Connexion réussie!")
+                return True
             else:
                 messagebox.showerror("Test de connexion", f"✗ Échec de la connexion:\n\n{message}")
+                return False
         except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du test:\n\n{str(e)}")
+            logger.error("Erreur de création du client de test: %s", type(e).__name__)
+            messagebox.showerror(
+                "Erreur",
+                f"Impossible de préparer le test de connexion ({type(e).__name__}).",
+            )
+            return False
+        finally:
+            if test_client is not None:
+                test_client.close()
 
     def _save_settings(self) -> None:
         """Sauvegarde les paramètres."""
+        previous_config = copy.deepcopy(self.config)
+        saved = False
         try:
+            current_signature = self._get_current_ai_signature()
+            if self._last_successful_test_signature != current_signature:
+                should_test = messagebox.askyesno(
+                    "Validation requise",
+                    "Les paramètres IA ont changé et n'ont pas été testés.\n\n"
+                    "Voulez-vous tester la connexion avant la sauvegarde ?"
+                )
+                if not should_test:
+                    return
+                if not self._test_connection():
+                    return
+
             # Mettre à jour la configuration
-            self.config.ai.api_key = self.api_key_var.get()
-            self.config.ai.base_url = self.base_url_var.get()
-            self.config.ai.model = self.model_var.get()
+            self.config.ai.api_key = self.api_key_var.get().strip()
+            self.config.ai.base_url = self.base_url_var.get().strip()
+            self.config.ai.model = self.model_var.get().strip()
             self.config.ai.temperature = self.temperature_var.get()
             self.config.ai.timeout = self.timeout_var.get()
             self.config.ai.verify_ssl = self.verify_ssl_var.get()
 
-            self.config.security.encryption_enabled = self.encryption_var.get()
-            self.config.security.use_keyring = self.keyring_var.get()
+            self.config.security.encryption_enabled = True
+            self.config.security.use_keyring = True
             self.config.security.app_lock_enabled = self.app_lock_var.get()
             self.config.security.auto_lock_minutes = self.auto_lock_var.get()
 
@@ -339,18 +377,51 @@ class SettingsWindow:
             # Valider la configuration
             valid, errors = self.config_manager.validate()
             if not valid:
+                self.config_manager.config = previous_config
+                self.config = previous_config
                 messagebox.showerror("Erreur de validation", "\n".join(errors))
                 return
 
             # Sauvegarder
-            self.config_manager.save_config()
+            if not self.config_manager.save_config():
+                self.config_manager.config = previous_config
+                self.config = previous_config
+                messagebox.showerror(
+                    "Erreur",
+                    "Impossible de sauvegarder la configuration.\n\n"
+                    "Vérifiez que le trousseau système est disponible pour stocker la clé API."
+                )
+                return
 
+            saved = True
+            init_openai_client(
+                api_key=self.config.ai.api_key,
+                base_url=self.config.ai.base_url,
+                model=self.config.ai.model,
+                temperature=self.config.ai.temperature,
+                max_tokens=self.config.ai.max_tokens,
+                timeout=self.config.ai.timeout,
+                verify_ssl=self.config.ai.verify_ssl,
+            )
             messagebox.showinfo("Succès", "Les paramètres ont été sauvegardés avec succès!")
             logger.info("Paramètres sauvegardés")
 
         except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde: {e}")
-            messagebox.showerror("Erreur", f"Une erreur s'est produite:\n\n{str(e)}")
+            if not saved:
+                self.config_manager.config = previous_config
+                self.config = previous_config
+            logger.error("Erreur lors de la sauvegarde: %s", type(e).__name__)
+            if saved:
+                messagebox.showerror(
+                    "Configuration enregistrée",
+                    "Les paramètres sont sauvegardés, mais le client IA n'a pas pu être reconfiguré. "
+                    "Redémarrez l'application.",
+                )
+            else:
+                messagebox.showerror(
+                    "Erreur",
+                    f"Une erreur s'est produite ({type(e).__name__}).",
+                )
 
     def _reset_to_defaults(self) -> None:
         """Réinitialise aux valeurs par défaut."""
@@ -360,10 +431,33 @@ class SettingsWindow:
         )
 
         if response:
+            previous_config = copy.deepcopy(self.config)
             self.config_manager.reset_to_defaults()
             self.config = self.config_manager.get_config()
+            if not self.config_manager.save_config():
+                self.config_manager.config = previous_config
+                self.config = previous_config
+                messagebox.showerror(
+                    "Erreur",
+                    "Impossible de sauvegarder les paramètres par défaut. Vérifiez le trousseau système.",
+                    parent=self.window,
+                )
+                return
+            init_openai_client(
+                api_key=self.config.ai.api_key,
+                base_url=self.config.ai.base_url,
+                model=self.config.ai.model,
+                temperature=self.config.ai.temperature,
+                max_tokens=self.config.ai.max_tokens,
+                timeout=self.config.ai.timeout,
+                verify_ssl=self.config.ai.verify_ssl,
+            )
             self.window.destroy()
-            messagebox.showinfo("Succès", "Paramètres réinitialisés. Veuillez redémarrer l'application.")
+            messagebox.showinfo(
+                "Succès",
+                "Paramètres réinitialisés et clé API supprimée. "
+                "Redémarrez l'application pour appliquer l'apparence par défaut.",
+            )
 
     def _on_app_lock_changed(self) -> None:
         """Appelé quand l'option app_lock change."""
@@ -454,4 +548,5 @@ class SettingsWindow:
     def _update_password_status(self) -> None:
         """Met à jour le statut du mot de passe."""
         status_text = "✅ Un mot de passe est défini" if self.config_manager.has_password() else "⚠ Aucun mot de passe défini"
-        self.password_status_label.config(text=status_text)
+        if hasattr(self, "password_status_label"):
+            self.password_status_label.config(text=status_text)

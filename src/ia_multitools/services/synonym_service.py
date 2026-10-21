@@ -118,7 +118,6 @@ class SynonymService:
                     ai_response=response,
                     metadata={
                         "mode": mode,
-                        "output_format": output_format,
                         "temperature": temperature or self.client.temperature
                     }
                 )

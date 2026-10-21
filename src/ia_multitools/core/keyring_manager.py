@@ -30,7 +30,7 @@ class KeyringManager:
         if self._available:
             logger.info(f"Trousseau système disponible: {keyring.get_keyring().__class__.__name__}")
         else:
-            logger.warning("Aucun trousseau système disponible, utilisation du stockage chiffré uniquement")
+            logger.warning("Aucun trousseau système fonctionnel n'est disponible")
 
     def _check_availability(self) -> bool:
         """
@@ -41,11 +41,7 @@ class KeyringManager:
         """
         try:
             current_keyring = keyring.get_keyring()
-            # Vérifier que ce n'est pas le keyring "fail" (placeholder)
-            keyring_name = current_keyring.__class__.__name__
-            if "fail" in keyring_name.lower() or "null" in keyring_name.lower():
-                return False
-            return True
+            return current_keyring.priority > 0
         except Exception as e:
             logger.warning(f"Impossible de vérifier le trousseau: {e}")
             return False
@@ -79,10 +75,10 @@ class KeyringManager:
             logger.debug(f"Mot de passe stocké pour l'utilisateur: {username}")
             return True
         except KeyringError as e:
-            logger.error(f"Erreur lors du stockage du mot de passe: {e}")
+            logger.error("Erreur lors du stockage dans le trousseau: %s", type(e).__name__)
             return False
         except Exception as e:
-            logger.error(f"Erreur inattendue lors du stockage: {e}")
+            logger.error("Erreur inattendue lors du stockage dans le trousseau: %s", type(e).__name__)
             return False
 
     def get_password(self, username: str) -> Optional[str]:
@@ -107,11 +103,11 @@ class KeyringManager:
                 logger.debug(f"Aucun mot de passe trouvé pour l'utilisateur: {username}")
             return password
         except KeyringError as e:
-            logger.error(f"Erreur lors de la récupération du mot de passe: {e}")
-            return None
+            logger.error("Erreur lors de la récupération depuis le trousseau: %s", type(e).__name__)
+            raise RuntimeError("Impossible de lire le trousseau système") from e
         except Exception as e:
-            logger.error(f"Erreur inattendue lors de la récupération: {e}")
-            return None
+            logger.error("Erreur inattendue lors de la récupération depuis le trousseau: %s", type(e).__name__)
+            raise RuntimeError("Impossible de lire le trousseau système") from e
 
     def delete_password(self, username: str) -> bool:
         """
@@ -133,7 +129,7 @@ class KeyringManager:
             return True
         except keyring.errors.PasswordDeleteError:
             logger.warning(f"Aucun mot de passe à supprimer pour: {username}")
-            return False
+            return True
         except Exception as e:
             logger.error(f"Erreur lors de la suppression du mot de passe: {e}")
             return False
@@ -214,4 +210,3 @@ def get_keyring_manager() -> KeyringManager:
     if _keyring_manager is None:
         _keyring_manager = KeyringManager()
     return _keyring_manager
-
